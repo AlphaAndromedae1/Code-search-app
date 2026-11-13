@@ -222,7 +222,7 @@ struct DocumentScanner: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: VNDocumentCameraViewController, context: Context) {}
 
     @MainActor
-    final class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
+    final class Coordinator: NSObject, @preconcurrency VNDocumentCameraViewControllerDelegate {
         let onFinish: ([UIImage]) -> Void
         let onCancel: () -> Void
 
