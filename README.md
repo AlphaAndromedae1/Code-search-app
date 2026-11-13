@@ -60,6 +60,17 @@ Your library stays on your device. The app only goes online when you use the by-
 - When you're on a linked page, a “🔗 linked” button appears in the reader. Tap it to jump to the related pages.
 - Manage everything in the **Saved** tab, and open any two linked pages side by side.
 
+## Planned
+
+Ideas queued for later versions:
+
+1. **Tap a reference to jump to it.** Record where each rule/article starts during indexing, so you can tap "see Rule 26-700" or "Sentence 9.10.14.5.(2)", type `26-700` in Go to Page, and see a "Same rule in other books" button (e.g. a CE Code rule with its OESC amendment and related ESA bulletins).
+2. **Search synonyms.** GFCI ↔ ground fault, receptacle ↔ outlet, smoke alarm ↔ smoke detector, barrier-free ↔ accessible.
+3. **Track editions.** Mark older books as superseded (e.g. OESC 2021 once 2024 applies), so current editions come first in search while older ones stay available.
+4. **Highlights and notes on pages.** Highlight passages and pin notes directly on code pages.
+5. **Weekly reminder to check updates.** A local notification nudging you to tap "Check for New Bulletins". Nothing would be fetched in the background.
+6. **Site notes with code citations.** Take a photo, attach the rule it relates to, and export a simple PDF list for deficiency lists and inspection follow-ups.
+
 ## Getting the .ipa (no Mac needed)
 
 You can't build iOS apps on Windows or Linux directly, but GitHub provides free Mac build machines. The included workflow builds the app there.
@@ -81,6 +92,8 @@ You can't build iOS apps on Windows or Linux directly, but GitHub provides free 
    If you'd rather use the website's “Add file → Upload files”, note that it can skip the hidden `.github` folder. If it does, create the file `.github/workflows/build-ipa.yml` by hand (“Add file → Create new file”) and paste in its contents.
 3. Open the **Actions** tab of the repository. The **Build IPA** workflow runs on every push (or press **Run workflow**). It takes about 5–10 minutes.
 4. When it shows a green check, open the run and download the **CodeShelf-ipa** artifact. Unzip it to get `CodeShelf.ipa`.
+
+The workflow also runs a **simulator smoke test**. It launches the app on an iPhone simulator, imports two sample PDFs from `Tests/Fixtures`, and checks that they are filed and indexed correctly and that searches for `26-700`, `9.10.19.1` and `smoke alarm` work. It then relaunches the app to confirm the saved library reloads, and uploads a screenshot as the **simulator-screenshot** artifact.
 
 If the build fails, download the **xcodebuild-log** artifact (or copy the red error lines from the log) and fix the reported error. Pasting it back to Claude works.
 
