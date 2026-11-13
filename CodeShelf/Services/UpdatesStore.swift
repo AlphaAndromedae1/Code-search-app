@@ -275,6 +275,8 @@ final class UpdatesStore {
         let building = ["OBC", "ONTARIO BUILDING", "BUILDING CODE"]
         let fire = ["OFC", "ONTARIO FIRE", "FIRE CODE", "FPPA"]
         let gas = ["B149", "TSSA", "NATURAL GAS", "PROPANE", "GASEOUS FUELS"]
+        let oil = ["B139", "LFHC", "FUEL OIL", "FURNACE OIL", "HEATING OIL", "OIL-BURNING", "OIL BURNING",
+                   "LIQUID FUELS", "GASOLINE", "DIESEL", "PETROLEUM"]
 
         var list: [SourceSuggestion] = [
             // Electrical — ESA, CSA, e-Laws
@@ -369,6 +371,38 @@ final class UpdatesStore {
                                "Web search for new editions, amendments and interpretations of CSA B149.1 and B149.2",
                                query: "CSA B149.1 B149.2 natural gas propane installation code amendment new edition"),
                 keywords: gas, categories: [.gas]),
+
+            // Fuel oil & petroleum — TSSA, e-Laws, CSA, ERO
+            SourceSuggestion(
+                source: page("tssa-fuel-oil", "TSSA — Fuel oil",
+                             "TSSA's fuel oil program: code adoption document amendments and advisories",
+                             "https://tssa.org/fuel-oil"),
+                keywords: oil, categories: [.oil]),
+            SourceSuggestion(
+                source: page("elaws-fuel-oil", "e-Laws — Fuel Oil (O. Reg. 213/01)",
+                             "New amending regulations for fuel oil equipment and tanks appear here",
+                             "https://www.ontario.ca/laws/regulation/010213"),
+                keywords: oil, categories: [.oil]),
+            SourceSuggestion(
+                source: page("elaws-liquid-fuels", "e-Laws — Liquid Fuels (O. Reg. 217/01)",
+                             "New amending regulations for gasoline and diesel facilities appear here",
+                             "https://www.ontario.ca/laws/regulation/010217"),
+                keywords: oil, categories: [.oil]),
+            SourceSuggestion(
+                source: search("csa-b139-search", "Search: CSA B139 oil-burning equipment code updates",
+                               "Web search for new editions and Ontario amendments of CSA B139",
+                               query: "CSA B139 installation code oil-burning equipment Ontario amendment code adoption document"),
+                keywords: oil, categories: [.oil]),
+            SourceSuggestion(
+                source: search("tssa-lfhc-search", "Search: Liquid Fuels Handling Code amendments",
+                               "Web search for TSSA Liquid Fuels Handling Code amendments, director's orders and advisories",
+                               query: "TSSA Liquid Fuels Handling Code amendment code adoption document advisory"),
+                keywords: oil, categories: [.oil]),
+            SourceSuggestion(
+                source: search("ero-fuels-search", "Search: proposed fuels code changes (ERO)",
+                               "Proposed TSSA code adoption document changes posted for comment on the Environmental Registry of Ontario",
+                               query: "Environmental Registry of Ontario TSSA code adoption document amendment proposal fuel"),
+                keywords: gas + oil, categories: [.gas, .oil]),
 
             // National model codes — only if the library has them
             SourceSuggestion(

@@ -6,6 +6,7 @@ struct LibraryView: View {
     @State private var showImporter = false
     @State private var showSettings = false
     @State private var showMunicipal = false
+    @State private var showManuals = false
     @State private var editingBook: Book? = nil
     @State private var pendingDelete: Book? = nil
     @State private var filter = ""
@@ -40,6 +41,11 @@ struct LibraryView: View {
                         } label: {
                             Label("Ontario Laws & By-laws…", systemImage: "building.columns")
                         }
+                        Button {
+                            showManuals = true
+                        } label: {
+                            Label("Manufacturer Instructions…", systemImage: "wrench.and.screwdriver")
+                        }
                     } label: {
                         Label("Add", systemImage: "plus")
                     }
@@ -61,6 +67,9 @@ struct LibraryView: View {
             }
             .sheet(isPresented: $showMunicipal) {
                 MunicipalCodeView()
+            }
+            .sheet(isPresented: $showManuals) {
+                ManufacturerInstructionsView()
             }
             .confirmationDialog("Delete this code book?", isPresented: deleteBinding, titleVisibility: .visible, presenting: pendingDelete) { book in
                 Button("Delete “\(book.displayName)”", role: .destructive) {
@@ -170,7 +179,7 @@ struct LibraryView: View {
     private func matchesFilter(_ book: Book) -> Bool {
         let text = filter.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return true }
-        return [book.title, book.shortName, book.jurisdiction, book.edition, book.category.label]
+        return [book.title, book.shortName, book.jurisdiction, book.edition, book.category.label, book.modelNumbers, book.equipmentType]
             .contains { $0.localizedCaseInsensitiveContains(text) }
     }
 }
@@ -238,6 +247,7 @@ struct BookRow: View {
     private var detailLine: String {
         var parts: [String] = []
         if !book.subtitle.isEmpty { parts.append(book.subtitle) }
+        if !book.modelNumbers.isEmpty { parts.append("Models: \(book.modelNumbers)") }
         parts.append("\(book.pageCount) pages")
         if book.ocrPages > 0 { parts.append("\(book.ocrPages) scanned") }
         return parts.joined(separator: " · ")

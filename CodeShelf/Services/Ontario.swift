@@ -98,6 +98,24 @@ enum Ontario {
             category: .gas,
             shortName: "Propane Reg. 211/01"
         ),
+        OntarioLaw(
+            id: "fuel-oil",
+            name: "Fuel Oil",
+            citation: "O. Reg. 213/01",
+            detail: "Furnace / heating oil equipment and tanks; adopts CSA B139 through TSSA's Fuel Oil Code Adoption Document",
+            address: "https://www.ontario.ca/laws/regulation/010213",
+            category: .oil,
+            shortName: "Fuel Oil Reg. 213/01"
+        ),
+        OntarioLaw(
+            id: "liquid-fuels",
+            name: "Liquid Fuels",
+            citation: "O. Reg. 217/01",
+            detail: "Gasoline, diesel and associated products — bulk plants, retail and private outlets, marinas; adopts TSSA's Liquid Fuels Handling Code",
+            address: "https://www.ontario.ca/laws/regulation/010217",
+            category: .oil,
+            shortName: "Liquid Fuels Reg. 217/01"
+        ),
     ]
 
     static func law(id: String) -> OntarioLaw? {

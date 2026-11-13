@@ -9,6 +9,13 @@ struct BookEditView: View {
         _draft = State(initialValue: book)
     }
 
+    /// Standard equipment types, plus the book's own value if it was typed in differently.
+    private var equipmentChoices: [String] {
+        let list = ManualInfo.equipmentTypes
+        let current = draft.equipmentType
+        return current.isEmpty || list.contains(current) ? list : [current] + list
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -20,8 +27,20 @@ struct BookEditView: View {
                             Label(category.label, systemImage: category.symbol).tag(category)
                         }
                     }
-                    TextField("Jurisdiction / publisher", text: $draft.jurisdiction, prompt: Text("e.g. ESA, CSA, NFPA, City of Ottawa"))
-                    TextField("Edition / year", text: $draft.edition, prompt: Text("e.g. 2024"))
+                    if draft.category == .manufacturer {
+                        TextField("Manufacturer", text: $draft.jurisdiction, prompt: Text("e.g. Carrier, Lennox, Beckett"))
+                        TextField("Model number(s)", text: $draft.modelNumbers, prompt: Text("e.g. 59SC5A080, 59SC5A100"))
+                        Picker("Equipment", selection: $draft.equipmentType) {
+                            Text("—").tag("")
+                            ForEach(equipmentChoices, id: \.self) { type in
+                                Text(type).tag(type)
+                            }
+                        }
+                        TextField("Revision / date", text: $draft.edition, prompt: Text("e.g. Rev. C, 2023"))
+                    } else {
+                        TextField("Jurisdiction / publisher", text: $draft.jurisdiction, prompt: Text("e.g. ESA, CSA, NFPA, City of Ottawa"))
+                        TextField("Edition / year", text: $draft.edition, prompt: Text("e.g. 2024"))
+                    }
                 } header: {
                     Text("Details")
                 } footer: {

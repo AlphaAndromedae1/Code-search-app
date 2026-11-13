@@ -103,7 +103,8 @@ jobs:
           echo "DATA=$DATA" >> "$GITHUB_ENV"
           mkdir -p "$DATA/tmp/fixtures"
           cp Tests/Fixtures/*.pdf "$DATA/tmp/fixtures/"
-          xcrun simctl launch "$UDID" "$BUNDLE" -importOnLaunch "$DATA/tmp/fixtures/OESC 2024 sample.pdf|$DATA/tmp/fixtures/2-7-26.pdf"
+          F="$DATA/tmp/fixtures"
+          xcrun simctl launch "$UDID" "$BUNDLE" -importOnLaunch "$F/OESC 2024 sample.pdf|$F/2-7-26.pdf|$F/CSA B139-24 Installation code for oil-burning equipment.pdf|$F/Acme AF100 Furnace Installation Instructions.pdf"
 
       - name: Verify import, indexing and search
         run: python3 Tests/smoke_check.py "$DATA/Library/Application Support/CodeShelf"

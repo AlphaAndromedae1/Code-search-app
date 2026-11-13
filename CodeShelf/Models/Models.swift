@@ -9,10 +9,12 @@ enum CodeCategory: String, Codable, CaseIterable, Identifiable, Sendable {
     case plumbing
     case mechanical
     case gas
+    case oil
     case energy
     case accessibility
     case municipal
     case standard
+    case manufacturer
     case bulletin
     case other
 
@@ -27,10 +29,12 @@ enum CodeCategory: String, Codable, CaseIterable, Identifiable, Sendable {
         case .plumbing: return "Plumbing"
         case .mechanical: return "Mechanical"
         case .gas: return "Gas & Propane"
+        case .oil: return "Fuel Oil & Petroleum"
         case .energy: return "Energy"
         case .accessibility: return "Accessibility"
         case .municipal: return "Municipal By-laws"
         case .standard: return "Standards"
+        case .manufacturer: return "Manufacturer Instructions"
         case .bulletin: return "Bulletins & Updates"
         case .other: return "Other"
         }
@@ -44,12 +48,14 @@ enum CodeCategory: String, Codable, CaseIterable, Identifiable, Sendable {
         case .fire: return "Ontario Fire Code (O. Reg. 213/07), Fire Protection and Prevention Act, OFM technical guidelines"
         case .electrical: return "Ontario Electrical Safety Code (O. Reg. 164/99), Canadian Electrical Code (CSA C22.1)"
         case .plumbing: return "OBC Part 7 plumbing, Part 8 sewage systems"
-        case .mechanical: return "CSA B52 refrigeration, B139 oil-burning equipment, HVAC"
+        case .mechanical: return "CSA B52 refrigeration, HVAC, ventilation"
         case .gas: return "CSA B149.1 Natural Gas and Propane Installation Code, B149.2 Propane Storage and Handling Code, Gaseous Fuels (O. Reg. 212/01), Propane Storage and Handling (O. Reg. 211/01), TSSA code adoption documents"
         case .energy: return "OBC SB-10, SB-12, NECB"
         case .accessibility: return "OBC barrier-free design, AODA standards, CSA B651"
         case .municipal: return "Your municipality's building, zoning, property standards, fence and pool by-laws"
+        case .oil: return "CSA B139 Installation Code for Oil-Burning Equipment, Fuel Oil (O. Reg. 213/01), Liquid Fuels (O. Reg. 217/01), TSSA Liquid Fuels Handling Code, gasoline and diesel storage and dispensing"
         case .standard: return "NFPA, ASHRAE, ASTM, ULC and other CSA standards the codes reference"
+        case .manufacturer: return "Installation, operation and service manuals for the equipment you install — furnaces, boilers, water heaters, oil burners and tanks, generators, panels"
         case .bulletin: return "ESA bulletins, CodeNews, TSSA advisories, OFM communiqués, CSA Memorandums of Revision"
         case .other: return "Anything else"
         }
@@ -64,10 +70,12 @@ enum CodeCategory: String, Codable, CaseIterable, Identifiable, Sendable {
         case .plumbing: return "drop"
         case .mechanical: return "wind"
         case .gas: return "fuelpump"
+        case .oil: return "drop.fill"
         case .energy: return "leaf"
         case .accessibility: return "figure.roll"
         case .municipal: return "building.columns"
         case .standard: return "doc.text"
+        case .manufacturer: return "wrench.and.screwdriver"
         case .bulletin: return "megaphone"
         case .other: return "book.closed"
         }
@@ -92,6 +100,10 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
     var notes: String = ""
     /// Web address a page was saved from (municipal codes, bulletins). Empty for imported files.
     var sourceURL: String = ""
+    /// Manufacturer instructions: model numbers covered (free text, e.g. "AF100, AF120").
+    var modelNumbers: String = ""
+    /// Manufacturer instructions: kind of equipment, e.g. "Furnace".
+    var equipmentType: String = ""
 
     init(title: String, fileName: String) {
         self.title = title
@@ -115,6 +127,7 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id, title, shortName, category, jurisdiction, edition, fileName, fileSize
         case pageCount, indexedPages, ocrPages, dateAdded, lastPage, notes, sourceURL
+        case modelNumbers, equipmentType
     }
 
     // Tolerant decoding so future versions can add fields without wiping the library.
@@ -134,7 +147,51 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
         dateAdded = try c.decodeIfPresent(Date.self, forKey: .dateAdded) ?? Date()
         lastPage = try c.decodeIfPresent(Int.self, forKey: .lastPage) ?? 0
         notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
+        modelNumbers = try c.decodeIfPresent(String.self, forKey: .modelNumbers) ?? ""
+        equipmentType = try c.decodeIfPresent(String.self, forKey: .equipmentType) ?? ""
         sourceURL = try c.decodeIfPresent(String.self, forKey: .sourceURL) ?? ""
+    }
+}
+
+/// Details entered for a manufacturer's manual.
+struct ManualInfo: Hashable, Sendable {
+    static let equipmentTypes = [
+        "Furnace", "Boiler", "Water heater", "Oil burner", "Oil tank", "Fireplace / heater",
+        "Generator", "Air conditioner / heat pump", "HRV / ERV / ventilation", "Unit heater",
+        "Electrical panel / equipment", "Fuel dispenser / tank", "Other",
+    ]
+
+    var manufacturer: String = ""
+    var models: String = ""
+    var equipmentType: String = "Furnace"
+
+    var isEmpty: Bool {
+        manufacturer.trimmingCharacters(in: .whitespaces).isEmpty && models.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// "Acme AF100" for the short name.
+    var shortName: String {
+        let firstModel = models.split(whereSeparator: { $0 == "," || $0 == ";" }).first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+        return [manufacturer.trimmingCharacters(in: .whitespaces), firstModel].filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
+    /// "Acme AF100, AF120 furnace installation instructions"
+    var title: String {
+        let base = [manufacturer.trimmingCharacters(in: .whitespaces), models.trimmingCharacters(in: .whitespaces)]
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let kind = equipmentType == "Other" ? "" : equipmentType.lowercased() + " "
+        return base.isEmpty ? "" : "\(base) \(kind)installation instructions"
+    }
+
+    func apply(to book: inout Book) {
+        book.category = .manufacturer
+        let maker = manufacturer.trimmingCharacters(in: .whitespaces)
+        if !maker.isEmpty { book.jurisdiction = maker }
+        book.modelNumbers = models.trimmingCharacters(in: .whitespaces)
+        book.equipmentType = equipmentType
+        if !shortName.isEmpty { book.shortName = shortName }
+        if !title.isEmpty { book.title = title }
     }
 }
 

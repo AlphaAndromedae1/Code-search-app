@@ -7,6 +7,8 @@ struct BrowserRoute: Hashable {
         case bulletin
         /// An Ontario law on e-Laws (the id of an `OntarioLaw`).
         case regulation(String)
+        /// A manufacturer's manual for the equipment described.
+        case manual(ManualInfo)
     }
 
     var url: URL
@@ -346,7 +348,17 @@ struct SaveWebPageSheet: View {
         case .bulletin:
             category = .bulletin
             jurisdiction = model.url?.host?.replacingOccurrences(of: "www.", with: "") ?? ""
+        case .manual(let info):
+            category = .manufacturer
+            jurisdiction = info.manufacturer.trimmingCharacters(in: .whitespaces)
+            shortName = info.shortName
+            if !info.title.isEmpty { title = info.title }
         }
+    }
+
+    private var manualInfo: ManualInfo? {
+        if case .manual(let info) = route.purpose { return info }
+        return nil
     }
 
     private func save() async {
@@ -374,7 +386,8 @@ struct SaveWebPageSheet: View {
                 category: category,
                 jurisdiction: jurisdiction,
                 sourceURL: model.url?.absoluteString ?? "",
-                replacing: replaceExisting ? existingBook?.id : nil
+                replacing: replaceExisting ? existingBook?.id : nil,
+                manual: manualInfo
             )
             if saved {
                 savedMessage = "Saved to your library. It's being indexed for search now — you can keep browsing and save more pages."

@@ -174,7 +174,8 @@ final class LibraryStore {
 
     // MARK: - Importing
 
-    func importPDFs(from urls: [URL]) async {
+    /// - Parameter manual: when importing a manufacturer's manual, the details entered for it.
+    func importPDFs(from urls: [URL], manual: ManualInfo? = nil) async {
         guard !urls.isEmpty else { return }
         importsInFlight += urls.count
         var problems: [String] = []
@@ -200,8 +201,10 @@ final class LibraryStore {
                     try? FileManager.default.removeItem(at: fileURL(for: book))
                     problems.append("“\(url.lastPathComponent)” is already in your library as “\(existing.displayName)”.")
                 } else {
-                    books.append(book)
-                    enqueueIndexing(book.id)
+                    var added = book
+                    manual?.apply(to: &added)
+                    books.append(added)
+                    enqueueIndexing(added.id)
                 }
             case .failure(let error):
                 problems.append("“\(url.lastPathComponent)”: \(error.localizedDescription)")
@@ -239,7 +242,8 @@ final class LibraryStore {
         category: CodeCategory,
         jurisdiction: String,
         sourceURL: String,
-        replacing existingID: UUID?
+        replacing existingID: UUID?,
+        manual: ManualInfo? = nil
     ) async -> Bool {
         let written = await Task.detached(priority: .userInitiated) { () -> Result<LibraryFiles.WrittenFile, Error> in
             do {
@@ -258,7 +262,7 @@ final class LibraryStore {
             return false
         }
 
-        let retrieved = "Retrieved " + Date().formatted(date: .abbreviated, time: .omitted)
+        let retrieved = (sourceURL.isEmpty ? "Added " : "Retrieved ") + Date().formatted(date: .abbreviated, time: .omitted)
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let existingID, let i = books.firstIndex(where: { $0.id == existingID }) {
@@ -275,6 +279,10 @@ final class LibraryStore {
             books[i].shortName = shortName.trimmingCharacters(in: .whitespacesAndNewlines)
             books[i].jurisdiction = jurisdiction.trimmingCharacters(in: .whitespacesAndNewlines)
             books[i].category = category
+            if let manual {
+                books[i].modelNumbers = manual.models.trimmingCharacters(in: .whitespaces)
+                books[i].equipmentType = manual.equipmentType
+            }
             try? FileManager.default.removeItem(at: oldFile)
             labelDocuments.removeObject(forKey: existingID as NSUUID)
             thumbnails.removeObject(forKey: existingID as NSUUID)
@@ -294,6 +302,10 @@ final class LibraryStore {
             book.sourceURL = sourceURL
             book.pageCount = file.pageCount
             book.fileSize = file.fileSize
+            if let manual {
+                book.modelNumbers = manual.models.trimmingCharacters(in: .whitespaces)
+                book.equipmentType = manual.equipmentType
+            }
             books.append(book)
             enqueueIndexing(book.id)
         }
@@ -335,6 +347,8 @@ final class LibraryStore {
         books[i].jurisdiction = edited.jurisdiction.trimmingCharacters(in: .whitespacesAndNewlines)
         books[i].edition = edited.edition.trimmingCharacters(in: .whitespacesAndNewlines)
         books[i].notes = edited.notes
+        books[i].modelNumbers = edited.modelNumbers.trimmingCharacters(in: .whitespacesAndNewlines)
+        books[i].equipmentType = edited.equipmentType
         scheduleSave()
     }
 

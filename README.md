@@ -9,7 +9,7 @@ Your library stays on your device. The app only goes online when you use the by-
 **Library**
 - Import PDFs from the Files app, iCloud Drive, email attachments, or the share sheet (“Open in CodeShelf”).
 - Books are auto-sorted by category from the file name (e.g. `2024_OBC.pdf` becomes *Building · OBC 2024*, `CSA B149.1-25.pdf` becomes *Gas & Propane · B149.1 2025*, `ASHRAE 90.1-2019.pdf` becomes *Standards · ASHRAE 90.1 2019*, `2-7-26.pdf` becomes *Bulletins & Updates · Bulletin 2-7-26 (ESA)*). Title, short name, category, jurisdiction, edition and notes are all editable.
-- Categories: Building, Residential, Fire, Electrical, Plumbing, Mechanical, **Gas & Propane** (CSA B149.1 Natural Gas and Propane Installation Code, B149.2 Propane Storage and Handling Code, TSSA adoption documents), Energy, Accessibility, Municipal By-laws, **Standards** (NFPA, ASHRAE, ASTM, ULC and other CSA standards the codes reference), and Bulletins & Updates.
+- Categories: Building, Residential, Fire, Electrical, Plumbing, Mechanical, **Gas & Propane** (CSA B149.1 Natural Gas and Propane Installation Code, B149.2 Propane Storage and Handling Code, TSSA adoption documents), **Fuel Oil & Petroleum** (CSA B139 oil-burning equipment, Fuel Oil and Liquid Fuels regulations, TSSA Liquid Fuels Handling Code for gasoline and diesel), Energy, Accessibility, Municipal By-laws, **Standards** (NFPA, ASHRAE, ASTM, ULC and other CSA standards the codes reference), **Manufacturer Instructions**, and Bulletins & Updates.
 - Every page is indexed for full-text search in the background. Scanned PDFs (no selectable text) are read with Apple's on-device text recognition (OCR).
 
 **Search everything**
@@ -34,12 +34,17 @@ Your library stays on your device. The app only goes online when you use the by-
 - Swap sides, or **Link these pages** to save a cross-reference.
 
 **Ontario laws & your by-laws** (Library → + → Ontario Laws & By-laws)
-- **e-Laws:** one tap opens the official text of the Building Code regulation (O. Reg. 163/24) and Building Code Act, the Fire Code (O. Reg. 213/07, published in full) and Fire Protection and Prevention Act, the Electrical Safety Code regulation (O. Reg. 164/99), and TSSA's Gaseous Fuels (O. Reg. 212/01) and Propane Storage and Handling (O. Reg. 211/01) regulations. Save any of them as a searchable book.
+- **e-Laws:** one tap opens the official text of the Building Code regulation (O. Reg. 163/24) and Building Code Act, the Fire Code (O. Reg. 213/07, published in full) and Fire Protection and Prevention Act, the Electrical Safety Code regulation (O. Reg. 164/99), TSSA's Gaseous Fuels (O. Reg. 212/01), Propane Storage and Handling (O. Reg. 211/01), Fuel Oil (O. Reg. 213/01) and Liquid Fuels (O. Reg. 217/01) regulations. Save any of them as a searchable book.
 - **By-laws:** enter your municipality once. Ontario municipalities publish their own by-laws, so CodeShelf runs targeted searches (by-laws; building, zoning and property standards; building division; fence, pool, sign and tree by-laws; region/county by-laws) and opens the results in a built-in browser.
 - Star your municipality's by-law page (☆) so it opens straight there next time.
 - Open the by-law you need and tap **Save**. CodeShelf loads long pages completely, keeps the by-law text (dropping menus and sidebars), and saves it as a searchable PDF with the web address and date. By-laws posted as PDFs are saved as-is.
 - Later, open a saved page from **Saved From the Web** (or the reader's ••• → View Online) and save again to replace your copy. Bookmarks and links are kept.
 - Saving is one page at a time, on request, like "Print → Save as PDF". The app doesn't bulk-download whole sites.
+
+**Manufacturer instructions** (Library → + → Manufacturer Instructions)
+- Keep the installation manual for each model you install: furnaces, boilers, water heaters, oil burners and tanks, generators, panels and more. Codes like CSA B149.1 and B139 refer to the manufacturer's certified installation instructions.
+- Enter the manufacturer, model number(s) and equipment type, then **Import PDF**, **Scan Paper Instructions** with the camera (multi-page, auto-cropped, text-recognized so it's searchable), or **Find Online** and save the manufacturer's PDF.
+- Manuals are searched along with your codes. Filter the Library by manufacturer or model number, and link a manual page to the code clause it relates to with a cross-reference.
 
 **Updates & bulletins** (Updates tab)
 - Suggests Ontario sources to follow, matched to the codes in your library:
@@ -47,6 +52,8 @@ Your library stays on your device. The app only goes online when you use the by-
   - **Building:** the Ministry's Building Code updates page, e-Laws O. Reg. 163/24, the OBOA CodeNews archive, and a search for Building Code Commission / BMEC rulings.
   - **Fire:** e-Laws O. Reg. 213/07 and a search for Fire Marshal technical guidelines and communiqués.
   - **Gas & propane:** TSSA fuels news, TSSA code adoption documents and advisories, e-Laws O. Reg. 212/01 and 211/01, and CSA B149 updates.
+  - **Fuel oil & petroleum:** TSSA's fuel oil page, e-Laws O. Reg. 213/01 and 217/01, and searches for CSA B139 updates and Liquid Fuels Handling Code amendments.
+  - **Proposed changes:** a search for TSSA code adoption document proposals posted for comment on the Environmental Registry of Ontario.
   - **Your municipality:** a search for by-law amendments and building division notices.
   - You can add any page with +.
 - **e-Laws amendments:** following a regulation's e-Laws page flags each new amending regulation (e.g. *O. Reg. 325/26 — amends Fire Code*) the next time you check.
@@ -93,7 +100,7 @@ You can't build iOS apps on Windows or Linux directly, but GitHub provides free 
 3. Open the **Actions** tab of the repository. The **Build IPA** workflow runs on every push (or press **Run workflow**). It takes about 5–10 minutes.
 4. When it shows a green check, open the run and download the **CodeShelf-ipa** artifact. Unzip it to get `CodeShelf.ipa`.
 
-The workflow also runs a **simulator smoke test**. It launches the app on an iPhone simulator, imports two sample PDFs from `Tests/Fixtures`, and checks that they are filed and indexed correctly and that searches for `26-700`, `9.10.19.1` and `smoke alarm` work. It then relaunches the app to confirm the saved library reloads, and uploads a screenshot as the **simulator-screenshot** artifact.
+The workflow also runs a **simulator smoke test**. It launches the app on an iPhone simulator, imports four sample PDFs from `Tests/Fixtures` (an OESC-style page, an ESA bulletin, a B139 page and a furnace manual), and checks that they are filed and indexed correctly and that searches for `26-700`, `9.10.19.1`, `7.3.1`, `smoke alarm` and `clearance combustible` work. It then relaunches the app to confirm the saved library reloads, and uploads a screenshot as the **simulator-screenshot** artifact.
 
 If the build fails, download the **xcodebuild-log** artifact (or copy the red error lines from the log) and fix the reported error. Pasting it back to Claude works.
 

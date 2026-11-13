@@ -98,6 +98,9 @@ enum MetadataGuesser {
         ("BUILDING CODE ACT", .building, "Building Code Act", "Ontario"),
         ("FIRE PROTECTION AND PREVENTION ACT", .fire, "FPPA", "Ontario"),
         ("GASEOUS FUELS", .gas, "Gaseous Fuels Reg. 212/01", "Ontario"),
+        ("LIQUID FUELS HANDLING CODE", .oil, "LFHC", "TSSA"),
+        ("OIL-BURNING EQUIPMENT", .oil, "B139", "CSA"),
+        ("OIL BURNING EQUIPMENT", .oil, "B139", "CSA"),
         ("NATURAL GAS AND PROPANE", .gas, "B149.1", "CSA"),
         ("PROPANE STORAGE AND HANDLING", .gas, "B149.2", "CSA"),
         ("FIELD APPROVAL OF FUEL", .gas, "B149.3", "CSA"),
@@ -123,7 +126,8 @@ enum MetadataGuesser {
         ("NECB", .energy, "NRC"),
         ("B149", .gas, "CSA"),
         ("B52", .mechanical, "CSA"),
-        ("B139", .mechanical, "CSA"),
+        ("B139", .oil, "CSA"),
+        ("LFHC", .oil, "TSSA"),
         ("B651", .accessibility, "CSA"),
         ("AODA", .accessibility, "Ontario"),
         ("TSSA", .gas, "TSSA"),
@@ -144,6 +148,15 @@ enum MetadataGuesser {
         ("HVAC", .mechanical),
         ("PROPANE", .gas),
         ("NATURAL GAS", .gas),
+        ("FURNACE OIL", .oil),
+        ("HEATING OIL", .oil),
+        ("FUEL OIL", .oil),
+        ("OIL BURNER", .oil),
+        ("OIL TANK", .oil),
+        ("LIQUID FUEL", .oil),
+        ("GASOLINE", .oil),
+        ("DIESEL", .oil),
+        ("PETROLEUM", .oil),
         ("FIRE", .fire),
         ("ENERGY", .energy),
         ("RESIDENTIAL", .residential),
@@ -154,6 +167,12 @@ enum MetadataGuesser {
     private static let bulletinHints = [
         "BULLETIN", "MEMORANDUM OF REVISION", "CODENEWS", "CODE NEWS", "INTERPRETATION",
         "ERRATA", "TECHNICAL INFORMATION", "TECHNICAL GUIDELINE", "ADVISORY", "NOTICE OF AMENDMENT",
+    ]
+
+    private static let manualHints = [
+        "INSTALLATION INSTRUCTIONS", "INSTALLATION MANUAL", "INSTALLATION AND OPERATION", "INSTALLATION, OPERATION",
+        "INSTALLATION & OPERATION", "OWNER'S MANUAL", "OWNERS MANUAL", "USER MANUAL", "USER'S MANUAL",
+        "SERVICE MANUAL", "OPERATING INSTRUCTIONS", "INSTALLER'S GUIDE", "INSTALLATION GUIDE", "SPEC SHEET",
     ]
 
     private static let municipalHints = [
@@ -212,6 +231,14 @@ enum MetadataGuesser {
             result.jurisdiction = "CSA"
         }
 
+        // Equipment manuals: "Acme AF100 Installation Instructions", "Owner's Manual", "IOM".
+        if manualHints.contains(where: { upper.contains($0) }) || tokens.contains("IOM") {
+            result.category = .manufacturer
+            result.jurisdiction = ""
+            result.shortName = ""
+            return result
+        }
+
         if municipalHints.contains(where: { upper.contains($0) }) {
             result.category = .municipal
             result.jurisdiction = ""
@@ -254,6 +281,8 @@ enum MetadataGuesser {
         ("164/99", .electrical, "OESC"),
         ("212/01", .gas, "Gaseous Fuels Reg. 212/01"),
         ("211/01", .gas, "Propane Reg. 211/01"),
+        ("213/01", .oil, "Fuel Oil Reg. 213/01"),
+        ("217/01", .oil, "Liquid Fuels Reg. 217/01"),
     ]
 
     /// True when the text cites "O. Reg. 163/24" (also written "O Reg 163-24" in file names).
