@@ -4,10 +4,19 @@ on:
   push:
     branches: ['**']
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Mac to build on (Apple-silicon machines are sometimes short on capacity)"
+        type: choice
+        default: macos-26-intel
+        options:
+          - macos-26-intel
+          - macos-latest
+          - macos-15
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ${{ inputs.runner || 'macos-26-intel' }}
     timeout-minutes: 30
     steps:
       - name: Check out code
@@ -63,7 +72,7 @@ jobs:
   # Runs the Debug build on an iPhone simulator, imports two sample PDFs and checks
   # that importing, categorizing, indexing and search work on real iOS.
   simulator-smoke-test:
-    runs-on: macos-latest
+    runs-on: ${{ inputs.runner || 'macos-26-intel' }}
     timeout-minutes: 40
     steps:
       - name: Check out code
