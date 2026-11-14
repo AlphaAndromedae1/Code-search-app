@@ -13,6 +13,11 @@ on:
       - "Tests/check_links.py"
       - ".github/workflows/check-links.yml"
   workflow_dispatch:
+    inputs:
+      urls:
+        description: "Optional: space-separated URLs to test instead of the built-in lists"
+        required: false
+        default: ""
 
 jobs:
   check-links:
@@ -23,4 +28,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check links
-        run: python3 Tests/check_links.py
+        env:
+          CANDIDATES: ${{ inputs.urls }}
+        run: python3 Tests/check_links.py $CANDIDATES

@@ -13,7 +13,8 @@ import urllib.error
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-HEADERS = {"User-Agent": "CodeShelf link check (https://github.com/AlphaAndromedae1/Code-search-app)"}
+# Identify like the iOS app (URLSession / CFNetwork); some manufacturer sites block generic script agents.
+HEADERS = {"User-Agent": "CodeShelf/1 CFNetwork/3826.400.120 Darwin/25.0.0", "Accept": "*/*"}
 
 
 def fetch(url, limit=2048):
@@ -28,6 +29,14 @@ def fetch(url, limit=2048):
 
 
 problems = []
+
+# Ad-hoc candidates: python3 Tests/check_links.py https://example.com/a.pdf ...
+if len(sys.argv) > 1:
+    print("== Candidate URLs")
+    for url in sys.argv[1:]:
+        status, kind, head = fetch(url)
+        print(f"  HTTP {status}  {kind[:50]}  {'PDF' if b'%PDF' in head else 'not a PDF'}  {url}")
+    sys.exit(0)
 
 print("== Fuel Equipment Library (must be PDFs)")
 catalog = json.loads((ROOT / "CodeShelf/Resources/FuelCatalog.json").read_text())["equipment"]
