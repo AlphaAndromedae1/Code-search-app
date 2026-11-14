@@ -107,6 +107,9 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
     var equipmentType: String = ""
     /// ETag / Last-Modified of the downloaded copy, to spot newer versions online.
     var sourceVersion: String = ""
+    /// True when `fileName` is a path inside Documents (On My iPhone › CodeShelf in Files);
+    /// false for older copies kept in the app's private storage.
+    var inDocuments: Bool = false
 
     init(title: String, fileName: String) {
         self.title = title
@@ -130,7 +133,7 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id, title, shortName, category, jurisdiction, edition, fileName, fileSize
         case pageCount, indexedPages, ocrPages, dateAdded, lastPage, notes, sourceURL
-        case modelNumbers, equipmentType, sourceVersion
+        case modelNumbers, equipmentType, sourceVersion, inDocuments
     }
 
     // Tolerant decoding so future versions can add fields without wiping the library.
@@ -153,6 +156,7 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
         modelNumbers = try c.decodeIfPresent(String.self, forKey: .modelNumbers) ?? ""
         equipmentType = try c.decodeIfPresent(String.self, forKey: .equipmentType) ?? ""
         sourceVersion = try c.decodeIfPresent(String.self, forKey: .sourceVersion) ?? ""
+        inDocuments = try c.decodeIfPresent(Bool.self, forKey: .inDocuments) ?? false
         sourceURL = try c.decodeIfPresent(String.self, forKey: .sourceURL) ?? ""
     }
 }

@@ -40,6 +40,13 @@ final class LibraryStore {
     @ObservationIgnored private var lastProgressUpdate = Date.distantPast
     @ObservationIgnored private var lastProgressSave = Date.distantPast
 
+    @ObservationIgnored private var watcher: DocumentsWatcher?
+    @ObservationIgnored private var scanDebounce: Task<Void, Never>?
+    @ObservationIgnored private var isScanning = false
+    @ObservationIgnored private var rescanRequested = false
+    /// Sizes seen on the previous scan, so a file still being copied in isn't read half-written.
+    @ObservationIgnored private var pendingSizes: [String: Int64] = [:]
+
     private let labelDocuments = NSCache<NSUUID, PDFDocument>()
     private let thumbnails = NSCache<NSUUID, UIImage>()
 
@@ -70,7 +77,18 @@ final class LibraryStore {
         labelDocuments.countLimit = 6
         thumbnails.countLimit = 300
 
-        Task { await self.reconcileIndex() }
+        DocumentsFolder.prepare()
+        moveExistingFilesIntoDocuments()
+
+        watcher = DocumentsWatcher { [weak self] in
+            self?.documentsChanged()
+        }
+        watcher?.start()
+
+        Task {
+            await self.reconcileIndex()
+            await self.scanDocumentsFolder()
+        }
     }
 
     // MARK: - Persistence
@@ -117,7 +135,10 @@ final class LibraryStore {
     }
 
     func fileURL(for book: Book) -> URL {
-        AppPaths.books.appendingPathComponent(book.fileName)
+        if book.inDocuments {
+            return DocumentsFolder.root.appendingPathComponent(book.fileName)
+        }
+        return AppPaths.books.appendingPathComponent(book.fileName)
     }
 
     /// A fresh PDFDocument for display. Each on-screen PDFView gets its own instance.
@@ -204,6 +225,13 @@ final class LibraryStore {
 
         for url in urls {
             let name = url.lastPathComponent
+            if DocumentsFolder.contains(url) {
+                // Already in On My iPhone › CodeShelf: the folder scan adds it without a second copy.
+                importsInFlight -= 1
+                logImport("\(name): already in the CodeShelf folder — scanning instead of copying")
+                await scanDocumentsFolder()
+                continue
+            }
             let scoped = url.startAccessingSecurityScopedResource()
             logImport("\(name): starting (security-scoped access: \(scoped ? "yes" : "no"))")
             let (result, steps) = await Task.detached(priority: .userInitiated) { () -> (Result<Book, Error>, [String]) in
@@ -232,6 +260,7 @@ final class LibraryStore {
                 } else {
                     var added = book
                     manual?.apply(to: &added)
+                    adoptIntoDocuments(&added)
                     books.append(added)
                     enqueueIndexing(added.id)
                     let message = "Added as “\(added.displayName)” (\(added.pageCount) pages) under \(added.category.label). Indexing it for search now."
@@ -319,6 +348,7 @@ final class LibraryStore {
 
         if let existingID, let i = books.firstIndex(where: { $0.id == existingID }) {
             let oldFile = fileURL(for: books[i])
+            books[i].inDocuments = false
             books[i].fileName = file.fileName
             books[i].fileSize = file.fileSize
             books[i].pageCount = file.pageCount
@@ -337,6 +367,9 @@ final class LibraryStore {
                 books[i].equipmentType = manual.equipmentType
             }
             try? FileManager.default.removeItem(at: oldFile)
+            var replaced = books[i]
+            adoptIntoDocuments(&replaced)
+            books[i] = replaced
             labelDocuments.removeObject(forKey: existingID as NSUUID)
             thumbnails.removeObject(forKey: existingID as NSUUID)
             if activeIndexID == existingID {
@@ -360,6 +393,7 @@ final class LibraryStore {
                 book.modelNumbers = manual.models.trimmingCharacters(in: .whitespaces)
                 book.equipmentType = manual.equipmentType
             }
+            adoptIntoDocuments(&book)
             books.append(book)
             enqueueIndexing(book.id)
         }
@@ -412,7 +446,12 @@ final class LibraryStore {
         scheduleSave()
     }
 
+    /// Deletes the book and its PDF (also from Files › On My iPhone › CodeShelf).
     func delete(_ book: Book) {
+        removeFromLibrary(book, deleteFile: true)
+    }
+
+    private func removeFromLibrary(_ book: Book, deleteFile: Bool) {
         let id = book.id
         if activeIndexID == id { indexTask?.cancel() }
         queue.removeAll { $0 == id }
@@ -427,10 +466,220 @@ final class LibraryStore {
         indexing[id] = nil
         labelDocuments.removeObject(forKey: id as NSUUID)
         thumbnails.removeObject(forKey: id as NSUUID)
-        try? FileManager.default.removeItem(at: fileURL(for: book))
+        if deleteFile {
+            try? FileManager.default.removeItem(at: fileURL(for: book))
+        }
         saveNow()
         let index = self.index
         Task { await index.deleteBook(id) }
+    }
+
+    // MARK: - Files app folder (On My iPhone › CodeShelf)
+
+    /// Moves a PDF the app just added from private staging into its category folder in Documents.
+    private func adoptIntoDocuments(_ book: inout Book) {
+        guard !book.inDocuments else { return }
+        let source = AppPaths.books.appendingPathComponent(book.fileName)
+        let target = DocumentsFolder.destination(for: book.title, category: book.category)
+        do {
+            try FileManager.default.moveItem(at: source, to: target.url)
+            book.fileName = target.path
+            book.inDocuments = true
+        } catch {
+            logImport("Couldn't move “\(book.title)” into the Files folder: \(error.localizedDescription)")
+        }
+    }
+
+    /// One-time move of PDFs stored privately by earlier versions, so Files shows the whole library.
+    private func moveExistingFilesIntoDocuments() {
+        var moved = 0
+        for i in books.indices where !books[i].inDocuments {
+            guard FileManager.default.fileExists(atPath: AppPaths.books.appendingPathComponent(books[i].fileName).path) else { continue }
+            var book = books[i]
+            adoptIntoDocuments(&book)
+            if book.inDocuments {
+                books[i] = book
+                moved += 1
+            }
+        }
+        if moved > 0 {
+            logImport("Moved \(moved) PDF(s) into Files › On My iPhone › CodeShelf")
+            saveNow()
+        }
+    }
+
+    private static let rejectedKey = "rejectedDocumentsFiles"
+
+    /// Files in the folder that couldn't be imported (path -> size|modified), so they aren't retried every scan.
+    private var rejectedFiles: [String: String] {
+        get { UserDefaults.standard.dictionary(forKey: LibraryStore.rejectedKey) as? [String: String] ?? [:] }
+        set { UserDefaults.standard.set(newValue, forKey: LibraryStore.rejectedKey) }
+    }
+
+    private func documentsChanged() {
+        scanDebounce?.cancel()
+        scanDebounce = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(1200))
+            guard !Task.isCancelled, let self else { return }
+            self.watcher?.start()
+            await self.scanDocumentsFolder()
+        }
+    }
+
+    /// Picks up PDFs added, moved, replaced or deleted in Files › On My iPhone › CodeShelf.
+    func scanDocumentsFolder() async {
+        if isScanning {
+            rescanRequested = true
+            return
+        }
+        isScanning = true
+        defer { isScanning = false }
+        repeat {
+            rescanRequested = false
+            let unstable = await performDocumentsScan()
+            if unstable {
+                // Something is still being copied in; look again shortly.
+                try? await Task.sleep(for: .milliseconds(1500))
+                rescanRequested = true
+            }
+        } while rescanRequested
+    }
+
+    /// - Returns: true if a file was still changing size and needs another look.
+    private func performDocumentsScan() async -> Bool {
+        let entries = await Task.detached(priority: .utility) { DocumentsFolder.listPDFs() }.value
+        let present = Set(entries.map(\.path))
+        var rejected = rejectedFiles.filter { present.contains($0.key) }
+        var unstable = false
+        var changed = false
+
+        // Books whose PDF has disappeared from its place (deleted, moved or renamed in Files).
+        var missing = books.filter { book in
+            book.inDocuments && !present.contains(book.fileName)
+                && !FileManager.default.fileExists(atPath: fileURL(for: book).path)
+        }
+
+        // PDFs replaced in place (same name, different file): re-read them.
+        var replacedIDs: [UUID] = []
+        for entry in entries {
+            guard let book = books.first(where: { $0.inDocuments && $0.fileName == entry.path }),
+                  book.fileSize > 0, entry.size != book.fileSize
+            else { continue }
+            if pendingSizes[entry.path] != entry.size {
+                pendingSizes[entry.path] = entry.size
+                unstable = true
+                continue
+            }
+            pendingSizes[entry.path] = nil
+            replacedIDs.append(book.id)
+        }
+        for id in replacedIDs {
+            guard let i = books.firstIndex(where: { $0.id == id }) else { continue }
+            let url = fileURL(for: books[i])
+            let pages = await Task.detached(priority: .utility) { PDFDocument(url: url)?.pageCount ?? 0 }.value
+            guard let j = books.firstIndex(where: { $0.id == id }), pages > 0 else { continue }
+            books[j].pageCount = pages
+            books[j].fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.int64Value ?? books[j].fileSize
+            books[j].lastPage = min(books[j].lastPage, pages - 1)
+            labelDocuments.removeObject(forKey: id as NSUUID)
+            thumbnails.removeObject(forKey: id as NSUUID)
+            logImport("\(books[j].fileName): file was replaced in Files — re-indexing")
+            reindex(bookID: id)
+            changed = true
+        }
+
+        // New PDFs.
+        let known = Set(books.filter(\.inDocuments).map(\.fileName))
+        for entry in entries where !known.contains(entry.path) {
+            let signature = "\(entry.size)|\(Int(entry.modified.timeIntervalSince1970))"
+            if rejected[entry.path] == signature { continue }
+
+            // Moved or renamed in Files: same size as a book whose file disappeared. Keeps bookmarks and links.
+            if let m = missing.firstIndex(where: { $0.fileSize == entry.size }),
+               let i = books.firstIndex(where: { $0.id == missing[m].id }) {
+                let oldTitle = DocumentsFolder.title(fromPath: books[i].fileName)
+                books[i].fileName = entry.path
+                if books[i].title == oldTitle {
+                    books[i].title = DocumentsFolder.title(fromPath: entry.path)
+                }
+                labelDocuments.removeObject(forKey: books[i].id as NSUUID)
+                missing.remove(at: m)
+                logImport("\(entry.path): matched to “\(books[i].displayName)” (moved or renamed in Files)")
+                changed = true
+                continue
+            }
+
+            // Wait until the file stops growing — Files may still be copying it in.
+            if pendingSizes[entry.path] != entry.size {
+                pendingSizes[entry.path] = entry.size
+                unstable = true
+                continue
+            }
+            pendingSizes[entry.path] = nil
+
+            logImport("\(entry.path): new PDF in the CodeShelf folder")
+            let url = DocumentsFolder.root.appendingPathComponent(entry.path)
+            let result = await Task.detached(priority: .userInitiated) { () -> Result<Book, Error> in
+                do {
+                    return .success(try LibraryFiles.inspectInPlace(url))
+                } catch {
+                    return .failure(error)
+                }
+            }.value
+
+            switch result {
+            case .success(var book):
+                book.fileName = entry.path
+                book.inDocuments = true
+                book.fileSize = entry.size
+                if let hint = DocumentsFolder.categoryHint(forPath: entry.path) {
+                    book.category = hint
+                    if hint == .manufacturer { book.shortName = "" }
+                }
+                if books.contains(where: { $0.inDocuments && $0.fileName == entry.path }) { continue }
+                if let existing = books.first(where: { $0.fileSize > 0 && $0.fileSize == book.fileSize && $0.pageCount == book.pageCount }) {
+                    rejected[entry.path] = signature
+                    let message = "Same file as “\(existing.displayName)”, which is already in your library. You can delete this copy in Files."
+                    importResults.append(ImportResult(fileName: entry.path, succeeded: false, message: message))
+                    logImport("\(entry.path): skipped — duplicate of “\(existing.displayName)”")
+                    continue
+                }
+                books.append(book)
+                enqueueIndexing(book.id)
+                importResults.append(ImportResult(
+                    fileName: entry.path,
+                    succeeded: true,
+                    message: "Added from the Files folder as “\(book.displayName)” (\(book.pageCount) pages) under \(book.category.label). Indexing it for search now."
+                ))
+                logImport("\(entry.path): added (\(book.pageCount) pages, \(book.category.label))")
+                changed = true
+            case .failure(let error):
+                rejected[entry.path] = signature
+                importResults.append(ImportResult(fileName: entry.path, succeeded: false, message: error.localizedDescription))
+                logImport("\(entry.path): FAILED — \(error.localizedDescription)")
+            }
+        }
+
+        // PDFs deleted in Files leave the library too (only once nothing is mid-copy, so renames aren't mistaken for deletes).
+        if !unstable {
+            for book in missing {
+                guard let current = self.book(id: book.id), current.inDocuments,
+                      !FileManager.default.fileExists(atPath: fileURL(for: current).path)
+                else { continue }
+                removeFromLibrary(current, deleteFile: false)
+                importResults.append(ImportResult(
+                    fileName: current.fileName,
+                    succeeded: true,
+                    message: "Removed “\(current.displayName)” from the library — its PDF was deleted in Files."
+                ))
+                logImport("\(current.fileName): deleted in Files — removed from the library")
+                changed = true
+            }
+        }
+
+        rejectedFiles = rejected
+        if changed { saveNow() }
+        return unstable
     }
 
     // MARK: - Indexing queue

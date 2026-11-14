@@ -85,6 +85,37 @@ check("protected.pdf: FAILED" in log_text and "FileOpen" in log_text,
       "DRM-protected PDF refused with a FileOpen explanation")
 check(not any("protected" in b["title"] for b in books), "DRM-protected PDF was not added to the library")
 
+# Every PDF lives in Documents (Files › On My iPhone › CodeShelf), filed by category.
+docs = root.parents[2] / "Documents"
+expected_paths = {
+    "OESC 2024 sample": "Code Books/OESC 2024 sample.pdf",
+    "2-7-26": "Bulletins/2-7-26.pdf",
+    "Acme AF100 Furnace Installation Instructions": "Manufacturer Instructions/Acme AF100 Furnace Installation Instructions.pdf",
+    "CSA B139-24 Installation code for oil-burning equipment": "Code Books/CSA B139-24 Installation code for oil-burning equipment.pdf",
+}
+for title, path in expected_paths.items():
+    book = by_title.get(title)
+    print(f"  {title!r}: inDocuments={book and book.get('inDocuments')} fileName={book and book.get('fileName')!r}")
+    check(book is not None and book.get("inDocuments") is True and book.get("fileName") == path and (docs / path).exists(),
+          f"'{title}' is in Files at CodeShelf/{path}")
+check(oil_code is not None and oil_code.get("inDocuments") is True,
+      "PDF copied into the Files folder was picked up automatically")
+
+# Deleting a PDF in Files removes it from the library.
+(docs / expected_paths["CSA B139-24 Installation code for oil-burning equipment"]).unlink()
+removed = False
+deadline = time.time() + 45
+while time.time() < deadline:
+    try:
+        titles = {b["title"] for b in json.loads((root / "library.json").read_text())["books"]}
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        titles = set()
+    if "CSA B139-24 Installation code for oil-burning equipment" not in titles:
+        removed = True
+        break
+    time.sleep(2)
+check(removed, "deleting a PDF in Files removes it from the library")
+
 if failures:
     print(f"\n{len(failures)} check(s) failed")
     sys.exit(1)

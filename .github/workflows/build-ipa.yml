@@ -113,7 +113,10 @@ jobs:
           mkdir -p "$DATA/tmp/fixtures"
           cp Tests/Fixtures/*.pdf "$DATA/tmp/fixtures/"
           F="$DATA/tmp/fixtures"
-          xcrun simctl launch "$UDID" "$BUNDLE" -disableAutomation YES -importOnLaunch "$F/OESC 2024 sample.pdf|$F/2-7-26.pdf|$F/CSA B139-24 Installation code for oil-burning equipment.pdf|$F/Acme AF100 Furnace Installation Instructions.pdf|$F/CSA B149.1-25 protected.pdf"
+          # Like dropping a PDF into Files › On My iPhone › CodeShelf › Code Books:
+          mkdir -p "$DATA/Documents/Code Books"
+          cp "Tests/Fixtures/CSA B139-24 Installation code for oil-burning equipment.pdf" "$DATA/Documents/Code Books/"
+          xcrun simctl launch "$UDID" "$BUNDLE" -disableAutomation YES -importOnLaunch "$F/OESC 2024 sample.pdf|$F/2-7-26.pdf|$F/Acme AF100 Furnace Installation Instructions.pdf|$F/CSA B149.1-25 protected.pdf"
 
       - name: Verify import, indexing and search
         run: python3 Tests/smoke_check.py "$DATA/Library/Application Support/CodeShelf"

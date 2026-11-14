@@ -8,6 +8,7 @@ struct LibraryView: View {
     @State private var showMunicipal = false
     @State private var showManuals = false
     @State private var showEquipment = false
+    @Environment(\.openURL) private var openURL
     @State private var editingBook: Book? = nil
     @State private var pendingDelete: Book? = nil
     @State private var filter = ""
@@ -96,11 +97,18 @@ struct LibraryView: View {
                     store.delete(book)
                 }
             } message: { _ in
-                Text("The PDF, its search index, and its bookmarks and cross-reference links will be removed from CodeShelf.")
+                Text("The PDF (including its copy in Files › On My iPhone › CodeShelf), its search index, and its bookmarks and cross-reference links will be removed.")
             }
             .navigationDestination(for: ReaderRoute.self) { route in
                 ReaderView(route: route)
             }
+        }
+    }
+
+    /// Opens On My iPhone › CodeShelf in the Files app.
+    private func openCodeShelfFolder() {
+        if let url = URL(string: "shareddocuments://" + DocumentsFolder.root.path) {
+            openURL(url)
         }
     }
 
@@ -115,14 +123,20 @@ struct LibraryView: View {
         ContentUnavailableView {
             Label("No Code Books Yet", systemImage: "books.vertical")
         } description: {
-            Text("Import the code books you own — CSA B149.1, B149.2, B139, TSSA code adoption documents, OBC and more. Manufacturer installation instructions for CSST, S636 venting, regulators, relief valves and tanks are downloaded automatically from the Fuel Equipment Library.")
+            Text("Add the code books you own — CSA B149.1, B149.2, B139, TSSA code adoption documents, OBC and more. Easiest: in the Files app, open On My iPhone › CodeShelf › Code Books and copy your PDFs in. They're added automatically. Manufacturer instructions for CSST, S636 venting, regulators, relief valves and tanks download automatically from the Fuel Equipment Library.")
         } actions: {
+            Button {
+                openCodeShelfFolder()
+            } label: {
+                Label("Open CodeShelf Folder in Files", systemImage: "folder")
+            }
+            .buttonStyle(.borderedProminent)
             Button {
                 showImporter = true
             } label: {
                 Label("Import PDFs", systemImage: "plus")
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.bordered)
             Button {
                 showMunicipal = true
             } label: {
@@ -140,6 +154,16 @@ struct LibraryView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+            }
+            Section {
+                Button {
+                    openCodeShelfFolder()
+                } label: {
+                    Label("Add PDFs in Files › On My iPhone › CodeShelf", systemImage: "folder.badge.plus")
+                        .font(.footnote)
+                }
+            } footer: {
+                Text("PDFs you copy into that folder (or any folder inside it) are added automatically. Deleting one there removes it here.")
             }
             ForEach(visibleCategories) { category in
                 Section {

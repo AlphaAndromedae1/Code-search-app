@@ -7,6 +7,7 @@ struct SettingsView: View {
     @AppStorage(AppSettings.autoCheckKey) private var autoCheck = true
     @AppStorage(AppSettings.notifyKey) private var notify = true
     @AppStorage(AppSettings.autoEquipmentKey) private var autoEquipment = true
+    @Environment(\.openURL) private var openURL
     @State private var pdfBytes: Int64 = 0
     @State private var indexBytes: Int64 = 0
     @State private var confirmRebuild = false
@@ -57,6 +58,20 @@ struct SettingsView: View {
                     tip("guard OR handrail", "Either word. The filter menu in Search can also switch to “match any word”.")
                     tip("26-700", "CE Code / OESC rule numbers work the same way.")
                     tip("6.18.2", "So do CSA B149 gas code clause numbers.")
+                }
+
+                Section {
+                    Button {
+                        if let url = URL(string: "shareddocuments://" + DocumentsFolder.root.path) {
+                            openURL(url)
+                        }
+                    } label: {
+                        Label("Open CodeShelf Folder in Files", systemImage: "folder")
+                    }
+                } header: {
+                    Text("Files App")
+                } footer: {
+                    Text("Your PDFs are in Files › On My iPhone › CodeShelf, in Code Books, Manufacturer Instructions, Bulletins and By-laws. Copy PDFs into any of these (or a folder you create there) and they're added automatically. Moving or renaming keeps bookmarks; deleting a PDF there removes it from CodeShelf.")
                 }
 
                 Section {

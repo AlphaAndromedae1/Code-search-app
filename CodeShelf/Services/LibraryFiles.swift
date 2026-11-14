@@ -68,17 +68,28 @@ enum LibraryFiles {
         }
         log("Opened PDF: \(document.pageCount) pages")
 
-        let baseName = source.deletingPathExtension().lastPathComponent
-        let cleanedName = baseName
+        var book = makeBook(from: document, sourceName: source.deletingPathExtension().lastPathComponent, fileName: fileName, size: size)
+        book.id = id
+        return book
+    }
+
+    /// Checks a PDF that is already in the Files folder and builds its metadata, without copying it.
+    static func inspectInPlace(_ url: URL) throws -> Book {
+        let document = try openChecked(url)
+        let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.int64Value ?? 0
+        return makeBook(from: document, sourceName: url.deletingPathExtension().lastPathComponent, fileName: "", size: size)
+    }
+
+    private static func makeBook(from document: PDFDocument, sourceName: String, fileName: String, size: Int64) -> Book {
+        let cleanedName = sourceName
             .replacingOccurrences(of: "_", with: " ")
             .trimmingCharacters(in: .whitespaces)
         var book = Book(title: cleanedName.isEmpty ? "Untitled Code Book" : cleanedName, fileName: fileName)
-        book.id = id
         book.pageCount = document.pageCount
         book.fileSize = size
 
         let pdfTitle = document.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String ?? ""
-        let guess = MetadataGuesser.guess(from: baseName + " " + pdfTitle)
+        let guess = MetadataGuesser.guess(from: sourceName + " " + pdfTitle)
         book.category = guess.category
         book.shortName = guess.shortName
         book.edition = guess.edition

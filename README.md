@@ -4,7 +4,9 @@ A private iPhone/iPad app for Ontario's fuel industry: CSA B149.1 / B149.2 natur
 
 Your library stays on your device. The app goes online only to check the TSSA, CSA and e-Laws pages you follow, to download manufacturer instructions from the manufacturers' own sites, and when you browse in the app.
 
-**Importing a PDF:** after you pick a file, the result appears at the top of the Library — added, already there, or why it couldn't be imported. PDFs locked with publisher DRM (such as FileOpen, used on some purchased standards) can only be opened in the publisher's approved reader, and CodeShelf says so instead of failing silently. Settings → Import Log shows each step if you need to troubleshoot.
+**Adding PDFs with the Files app:** open Files › On My iPhone › CodeShelf and copy PDFs into **Code Books** (or **Manufacturer Instructions**, **Bulletins**, **By-laws**, or any folder you create there). CodeShelf adds them automatically — no need to use the + button. Every PDF in the library lives in this folder: moving or renaming a file there keeps its bookmarks and links, replacing it re-indexes it, and deleting it removes it from CodeShelf. Settings and the Library have an **Open CodeShelf Folder in Files** button.
+
+**Importing a PDF:** with the + button, after you pick a file, the result appears at the top of the Library — added, already there, or why it couldn't be imported. PDFs locked with publisher DRM (such as FileOpen, used on some purchased standards) can only be opened in the publisher's approved reader, and CodeShelf says so instead of failing silently. Settings → Import Log shows each step if you need to troubleshoot.
 
 ## Features
 

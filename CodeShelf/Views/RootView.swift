@@ -58,6 +58,7 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
+                Task { await store.scanDocumentsFolder() }
                 Task { await runAutomaticTasks() }
             case .background:
                 store.saveNow()
