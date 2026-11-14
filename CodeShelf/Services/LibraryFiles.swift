@@ -5,14 +5,23 @@ import PDFKit
 enum LibraryFiles {
     enum ImportError: LocalizedError {
         case unreadable
+        case empty
         case locked
+        case protected(String)
+        case copyFailed(String)
 
         var errorDescription: String? {
             switch self {
             case .unreadable:
-                return "This file isn't a readable PDF."
+                return "This file isn't a readable PDF. If it came from a cloud drive, open it once in the Files app so it's fully downloaded, then try again."
+            case .empty:
+                return "This PDF has no pages."
             case .locked:
-                return "This PDF is password-protected. Remove the password (for example by printing it to a new PDF) and import it again."
+                return "This PDF needs a password to open. Remove the password (for example by printing it to a new PDF in Adobe Reader) and import it again."
+            case .protected(let system):
+                return "This PDF is locked with \(system) copy protection (DRM). Only the publisher's approved reader (usually Adobe Acrobat Reader with a plug-in) can open it, so no other app — including CodeShelf — can display or search it. Check whether the seller offers an unprotected PDF, an online version, or print."
+            case .copyFailed(let reason):
+                return "Couldn't copy the file into CodeShelf: \(reason)"
             }
         }
     }
@@ -30,28 +39,34 @@ enum LibraryFiles {
         let fileName = id.uuidString + ".pdf"
         let destination = AppPaths.books.appendingPathComponent(fileName)
         try data.write(to: destination, options: .atomic)
-        guard let document = PDFDocument(url: destination), document.pageCount > 0 else {
+        do {
+            let document = try openChecked(destination)
+            return WrittenFile(id: id, fileName: fileName, pageCount: document.pageCount, fileSize: Int64(data.count))
+        } catch {
             try? FileManager.default.removeItem(at: destination)
-            throw ImportError.unreadable
+            throw error
         }
-        return WrittenFile(id: id, fileName: fileName, pageCount: document.pageCount, fileSize: Int64(data.count))
     }
 
     /// Copies a PDF into the app's library folder and builds its initial metadata.
-    static func copyIntoLibrary(_ source: URL) throws -> Book {
+    /// `log` receives a line per step so failures can be diagnosed from Settings.
+    static func copyIntoLibrary(_ source: URL, log: (String) -> Void = { _ in }) throws -> Book {
         let id = UUID()
         let fileName = id.uuidString + ".pdf"
         let destination = AppPaths.books.appendingPathComponent(fileName)
-        try FileManager.default.copyItem(at: source, to: destination)
 
-        guard let document = PDFDocument(url: destination) else {
+        try coordinatedCopy(from: source, to: destination, log: log)
+        let size = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value ?? 0
+        log("Copied \(ByteCountFormatter.string(fromByteCount: size, countStyle: .file))")
+
+        let document: PDFDocument
+        do {
+            document = try openChecked(destination)
+        } catch {
             try? FileManager.default.removeItem(at: destination)
-            throw ImportError.unreadable
+            throw error
         }
-        if document.isLocked && !document.unlock(withPassword: "") {
-            try? FileManager.default.removeItem(at: destination)
-            throw ImportError.locked
-        }
+        log("Opened PDF: \(document.pageCount) pages")
 
         let baseName = source.deletingPathExtension().lastPathComponent
         let cleanedName = baseName
@@ -60,8 +75,7 @@ enum LibraryFiles {
         var book = Book(title: cleanedName.isEmpty ? "Untitled Code Book" : cleanedName, fileName: fileName)
         book.id = id
         book.pageCount = document.pageCount
-        let attributes = try? FileManager.default.attributesOfItem(atPath: destination.path)
-        book.fileSize = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+        book.fileSize = size
 
         let pdfTitle = document.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String ?? ""
         let guess = MetadataGuesser.guess(from: baseName + " " + pdfTitle)
@@ -70,6 +84,62 @@ enum LibraryFiles {
         book.edition = guess.edition
         book.jurisdiction = guess.jurisdiction
         return book
+    }
+
+    /// Copies through NSFileCoordinator so files in iCloud Drive, OneDrive, Google Drive, etc.
+    /// are downloaded before reading.
+    private static func coordinatedCopy(from source: URL, to destination: URL, log: (String) -> Void) throws {
+        var coordinationError: NSError?
+        var copyError: Error?
+        NSFileCoordinator().coordinate(readingItemAt: source, options: [], error: &coordinationError) { readableURL in
+            do {
+                try FileManager.default.copyItem(at: readableURL, to: destination)
+            } catch {
+                copyError = error
+            }
+        }
+        if let error = coordinationError ?? copyError {
+            log("Copy failed: \(error.localizedDescription)")
+            // Some providers refuse coordination; try a plain copy before giving up.
+            do {
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    try? FileManager.default.removeItem(at: destination)
+                }
+                try FileManager.default.copyItem(at: source, to: destination)
+                log("Plain copy succeeded")
+            } catch {
+                throw ImportError.copyFailed(error.localizedDescription)
+            }
+        }
+    }
+
+    /// Opens a PDF and explains clearly why it can't be used, if it can't.
+    static func openChecked(_ url: URL) throws -> PDFDocument {
+        let drm = protectionSystem(of: url)
+        if let drm { throw ImportError.protected(drm) }
+        guard let document = PDFDocument(url: url) else {
+            throw ImportError.unreadable
+        }
+        if document.isLocked && !document.unlock(withPassword: "") {
+            throw ImportError.locked
+        }
+        guard document.pageCount > 0 else { throw ImportError.empty }
+        return document
+    }
+
+    /// Recognizes third-party DRM security handlers that no PDF reader except the publisher's can open.
+    static func protectionSystem(of url: URL) -> String? {
+        guard let data = try? Data(contentsOf: url, options: .alwaysMapped) else { return nil }
+        let markers: [(bytes: String, name: String)] = [
+            ("/FOPN", "FileOpen"),
+            ("Adobe.APS", "Adobe LiveCycle Rights Management"),
+            ("/VitriumSecurity", "Vitrium"),
+            ("/HaihaiSecurity", "HaihaiSoft"),
+        ]
+        for marker in markers where data.range(of: Data(marker.bytes.utf8)) != nil {
+            return marker.name
+        }
+        return nil
     }
 }
 

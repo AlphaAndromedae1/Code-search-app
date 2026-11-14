@@ -1,8 +1,10 @@
 # CodeShelf
 
-A private iPhone/iPad app for the Ontario codes you own: the Ontario Building Code, Ontario Fire Code, OESC (with the CE Code it's based on), CSA B149 gas and propane codes, the standards they reference (NFPA, ASHRAE, ASTM, ULC, CSA), and your municipality's by-laws. Import them once, then search all of them at once, compare sections side by side, pull in Ontario regulations from e-Laws and your by-laws from your municipality's website, and keep up with new bulletins from ESA, TSSA, CSA and the Province.
+A private iPhone/iPad app for Ontario's fuel industry: CSA B149.1 / B149.2 natural gas and propane codes, CSA B139 oil-burning equipment, TSSA code adoption documents and advisories, and the manufacturer installation instructions for the equipment you install — CSST, ULC S636 venting, propane regulators, relief valves, tanks and cylinders. It also handles the OBC, Fire Code, OESC and municipal by-laws. Search everything at once, compare sections side by side, and get new TSSA / CSA / e-Laws updates automatically.
 
-Your library stays on your device. The app only goes online when you use the by-law browser or the Updates tab, and then only to the pages you open or follow.
+Your library stays on your device. The app goes online only to check the TSSA, CSA and e-Laws pages you follow, to download manufacturer instructions from the manufacturers' own sites, and when you browse in the app.
+
+**Importing a PDF:** after you pick a file, the result appears at the top of the Library — added, already there, or why it couldn't be imported. PDFs locked with publisher DRM (such as FileOpen, used on some purchased standards) can only be opened in the publisher's approved reader, and CodeShelf says so instead of failing silently. Settings → Import Log shows each step if you need to troubleshoot.
 
 ## Features
 
@@ -41,6 +43,11 @@ Your library stays on your device. The app only goes online when you use the by-
 - Later, open a saved page from **Saved From the Web** (or the reader's ••• → View Online) and save again to replace your copy. Bookmarks and links are kept.
 - Saving is one page at a time, on request, like "Print → Save as PDF". The app doesn't bulk-download whole sites.
 
+**Fuel Equipment Library** (Library → + → Fuel Equipment Library)
+- Manufacturer installation instructions for **CSST** (Gastite/FlashShield, WARDFlex, TracPipe CounterStrike), **ULC S636 venting** (DuraVent PolyPro, IPEX System 636, Centrotherm InnoFlue), **propane regulators** (RegO, Fisher R600/R622/R632, R122H/R222H/R232, 912/Y200, Marshall Excelsior), **relief valves** (Fisher H100 and H series, RegO) and **propane tanks & cylinders** (Manchester Tank, RegO, Worthington).
+- Documents with a direct manufacturer link are downloaded automatically and re-downloaded when the manufacturer posts a newer version (bookmarks and links are kept). The others open a search for the manufacturer's copy; once you save it, it's kept with your manuals.
+- The list lives in `CodeShelf/Resources/FuelCatalog.json`; the **Check links** workflow verifies every link weekly.
+
 **Manufacturer instructions** (Library → + → Manufacturer Instructions)
 - Keep the installation manual for each model you install: furnaces, boilers, water heaters, oil burners and tanks, generators, panels and more. Codes like CSA B149.1 and B139 refer to the manufacturer's certified installation instructions.
 - Enter the manufacturer, model number(s) and equipment type, then **Import PDF**, **Scan Paper Instructions** with the camera (multi-page, auto-cropped, text-recognized so it's searchable), or **Find Online** and save the manufacturer's PDF.
@@ -57,10 +64,11 @@ Your library stays on your device. The app only goes online when you use the by-
   - **Your municipality:** a search for by-law amendments and building division notices.
   - You can add any page with +.
 - **e-Laws amendments:** following a regulation's e-Laws page flags each new amending regulation (e.g. *O. Reg. 325/26 — amends Fire Code*) the next time you check.
-- **Check for New Bulletins** opens each followed page once and lists links that weren't there last time, most relevant first (tagged with the codes from your library and any rule numbers they mention). The first check of a page records what's already there.
+- **Automatic:** TSSA's advisories and code adoption documents, TSSA fuels news and fuel oil pages, CSA B149 searches and the fuel regulations on e-Laws are followed from the start. The app checks them when it opens (if 6+ hours have passed) and in the background a few times a day as iOS allows, and sends a notification when something new appears.
+- **Check for New Bulletins** checks right away. Each followed page is compared with last time, and new items are listed most relevant first (tagged with the codes from your library and any rule numbers they mention). The first check of a page records what's already there.
 - Open an item and tap **Save** to keep it. Saved or imported bulletins (e.g. the ESA bulletins included with the OESC, named like `2-7-26.pdf`) go under *Bulletins & Updates*.
 - **Bulletins linked to rules:** while reading a code, a 📣 button appears when a saved bulletin mentions a rule or section printed on that page (e.g. Rule 26-700, Article 9.10.14.5 or B149 Clause 6.18.2). Tap it to jump to the bulletin with the rule highlighted.
-- Checks only run when you tap the button. Nothing runs in the background.
+- Turn automatic checks, notifications and manufacturer downloads on or off in Settings → Automatic Updates.
 
 **Cross-references**
 - Save named links between pages in different books, e.g. *OESC Rule 26-700 ↔ CE Code Rule 26-700 (Ontario amendment)* or *OBC 9.8.8 ↔ City fence and pool enclosure by-law*, with notes.

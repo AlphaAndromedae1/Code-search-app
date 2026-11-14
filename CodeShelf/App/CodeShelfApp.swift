@@ -2,9 +2,10 @@ import SwiftUI
 
 @main
 struct CodeShelfApp: App {
-    @State private var store = LibraryStore()
+    @State private var store = LibraryStore.shared
     @State private var router = AppRouter()
-    @State private var updates = UpdatesStore()
+    @State private var updates = UpdatesStore.shared
+    @State private var equipment = EquipmentLibrary.shared
 
     var body: some Scene {
         WindowGroup {
@@ -12,6 +13,7 @@ struct CodeShelfApp: App {
                 .environment(store)
                 .environment(router)
                 .environment(updates)
+                .environment(equipment)
                 .onOpenURL { url in
                     // "Open in CodeShelf" / share sheet from Files, Mail, Safari, etc.
                     guard url.isFileURL else { return }
@@ -19,6 +21,10 @@ struct CodeShelfApp: App {
                     Task { await store.importPDFs(from: [url]) }
                 }
                 .task { await importLaunchArgumentFiles() }
+        }
+        // iOS wakes the app a few times a day to check TSSA / CSA / e-Laws for new items.
+        .backgroundTask(.appRefresh(BackgroundRefresh.taskID)) {
+            await BackgroundRefresh.run()
         }
     }
 

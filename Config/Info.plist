@@ -37,6 +37,14 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>CodeShelf uses the camera to scan paper installation instructions and manuals into your library.</string>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.personal.codeshelf.updates</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>

@@ -22,7 +22,12 @@ final class LibraryStore {
     private(set) var crossRefs: [CrossReference] = []
     private(set) var indexing: [UUID: IndexProgress] = [:]
     private(set) var importsInFlight = 0
+    private(set) var importResults: [ImportResult] = []
+    private(set) var importLog: [String] = []
     var alertMessage: String?
+
+    /// One library for the whole app (the background refresh task uses it too).
+    static let shared = LibraryStore()
 
     let index: SearchIndex
 
@@ -57,6 +62,10 @@ final class LibraryStore {
         books = data.books
         bookmarks = data.bookmarks
         crossRefs = data.crossRefs
+
+        if let saved = try? String(contentsOf: AppPaths.importLogFile, encoding: .utf8) {
+            importLog = saved.components(separatedBy: "\n").filter { !$0.isEmpty }
+        }
 
         labelDocuments.countLimit = 6
         thumbnails.countLimit = 300
@@ -175,20 +184,38 @@ final class LibraryStore {
     // MARK: - Importing
 
     /// - Parameter manual: when importing a manufacturer's manual, the details entered for it.
+    /// Shown at the top of the Library after an import, so the outcome is always visible.
+    struct ImportResult: Identifiable, Equatable {
+        let id = UUID()
+        let fileName: String
+        let succeeded: Bool
+        let message: String
+    }
+
+    /// - Parameter manual: when importing a manufacturer's manual, the details entered for it.
     func importPDFs(from urls: [URL], manual: ManualInfo? = nil) async {
-        guard !urls.isEmpty else { return }
+        guard !urls.isEmpty else {
+            logImport("The file picker returned no files")
+            return
+        }
+        importResults = []
         importsInFlight += urls.count
-        var problems: [String] = []
+        logImport("Importing \(urls.count) file(s)")
 
         for url in urls {
+            let name = url.lastPathComponent
             let scoped = url.startAccessingSecurityScopedResource()
-            let result = await Task.detached(priority: .userInitiated) { () -> Result<Book, Error> in
+            logImport("\(name): starting (security-scoped access: \(scoped ? "yes" : "no"))")
+            let (result, steps) = await Task.detached(priority: .userInitiated) { () -> (Result<Book, Error>, [String]) in
+                var collected: [String] = []
                 do {
-                    return .success(try LibraryFiles.copyIntoLibrary(url))
+                    let book = try LibraryFiles.copyIntoLibrary(url) { collected.append($0) }
+                    return (.success(book), collected)
                 } catch {
-                    return .failure(error)
+                    return (.failure(error), collected)
                 }
             }.value
+            for step in steps { logImport("\(name): \(step)") }
             if scoped { url.stopAccessingSecurityScopedResource() }
             if url.path.contains("/Inbox/") {
                 try? FileManager.default.removeItem(at: url)
@@ -199,22 +226,46 @@ final class LibraryStore {
             case .success(let book):
                 if let existing = books.first(where: { $0.fileSize > 0 && $0.fileSize == book.fileSize && $0.pageCount == book.pageCount }) {
                     try? FileManager.default.removeItem(at: fileURL(for: book))
-                    problems.append("“\(url.lastPathComponent)” is already in your library as “\(existing.displayName)”.")
+                    let message = "Already in your library as “\(existing.displayName)”."
+                    importResults.append(ImportResult(fileName: name, succeeded: false, message: message))
+                    logImport("\(name): skipped — \(message)")
                 } else {
                     var added = book
                     manual?.apply(to: &added)
                     books.append(added)
                     enqueueIndexing(added.id)
+                    let message = "Added as “\(added.displayName)” (\(added.pageCount) pages) under \(added.category.label). Indexing it for search now."
+                    importResults.append(ImportResult(fileName: name, succeeded: true, message: message))
+                    logImport("\(name): added (\(added.pageCount) pages, \(added.category.label))")
                 }
             case .failure(let error):
-                problems.append("“\(url.lastPathComponent)”: \(error.localizedDescription)")
+                importResults.append(ImportResult(fileName: name, succeeded: false, message: error.localizedDescription))
+                logImport("\(name): FAILED — \(error.localizedDescription)")
             }
         }
-
         saveNow()
-        if !problems.isEmpty {
-            alertMessage = problems.joined(separator: "\n\n")
-        }
+    }
+
+    /// The file picker itself reported an error.
+    func reportPickerFailure(_ error: Error) {
+        importResults = [ImportResult(fileName: "File picker", succeeded: false, message: error.localizedDescription)]
+        logImport("File picker error: \(error.localizedDescription)")
+    }
+
+    func dismissImportResults() {
+        importResults = []
+    }
+
+    func logImport(_ line: String) {
+        let stamp = Date().formatted(date: .abbreviated, time: .standard)
+        importLog.append("\(stamp)  \(line)")
+        if importLog.count > 300 { importLog.removeFirst(importLog.count - 300) }
+        try? importLog.joined(separator: "\n").write(to: AppPaths.importLogFile, atomically: true, encoding: .utf8)
+    }
+
+    func clearImportLog() {
+        importLog = []
+        try? FileManager.default.removeItem(at: AppPaths.importLogFile)
     }
 
     // MARK: - Pages saved from the web
@@ -243,7 +294,8 @@ final class LibraryStore {
         jurisdiction: String,
         sourceURL: String,
         replacing existingID: UUID?,
-        manual: ManualInfo? = nil
+        manual: ManualInfo? = nil,
+        sourceVersion: String = ""
     ) async -> Bool {
         let written = await Task.detached(priority: .userInitiated) { () -> Result<LibraryFiles.WrittenFile, Error> in
             do {
@@ -275,6 +327,7 @@ final class LibraryStore {
             books[i].lastPage = min(books[i].lastPage, max(0, file.pageCount - 1))
             books[i].edition = retrieved
             books[i].sourceURL = sourceURL
+            books[i].sourceVersion = sourceVersion
             if !cleanTitle.isEmpty { books[i].title = cleanTitle }
             books[i].shortName = shortName.trimmingCharacters(in: .whitespacesAndNewlines)
             books[i].jurisdiction = jurisdiction.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -300,6 +353,7 @@ final class LibraryStore {
             book.jurisdiction = jurisdiction.trimmingCharacters(in: .whitespacesAndNewlines)
             book.edition = retrieved
             book.sourceURL = sourceURL
+            book.sourceVersion = sourceVersion
             book.pageCount = file.pageCount
             book.fileSize = file.fileSize
             if let manual {

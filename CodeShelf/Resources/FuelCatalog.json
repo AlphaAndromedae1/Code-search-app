@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "note": "Manufacturer installation instructions CodeShelf downloads straight from each manufacturer. Entries with 'url' are downloaded automatically; entries with only 'search' are found by the user and then kept up to date. Checked by .github/workflows/check-links.yml.",
+  "equipment": [
+    {
+      "id": "gastite-di",
+      "types": ["CSST gas piping"],
+      "manufacturer": "Gastite (Titeflex)",
+      "title": "Gastite / FlashShield Design & Installation Guide",
+      "models": "Gastite, FlashShield, FlashShield+",
+      "url": "https://www.gastite.com/downloads/pdfs/gastite_di_guide.pdf"
+    },
+    {
+      "id": "wardflex-di",
+      "types": ["CSST gas piping"],
+      "manufacturer": "Ward Manufacturing (ASC Engineered Solutions)",
+      "title": "WARDFlex / WARDFlex MAX Design & Installation Guide",
+      "models": "WARDFlex, WARDFlex MAX",
+      "url": "https://www.asc-es.com/resource/WARDFlex%20Design%20%26%20Installation%20Guide%20%E2%80%93%20English"
+    },
+    {
+      "id": "tracpipe-di",
+      "types": ["CSST gas piping"],
+      "manufacturer": "OmegaFlex",
+      "title": "TracPipe CounterStrike Design Guide & Installation Instructions (Canada)",
+      "models": "TracPipe, CounterStrike",
+      "search": "TracPipe CounterStrike Canadian design guide and installation instructions FGP-001CAN OmegaFlex"
+    },
+    {
+      "id": "ipex-636",
+      "types": ["ULC S636 venting"],
+      "manufacturer": "IPEX",
+      "title": "System 636 PVC & CPVC Flue Gas Venting Installation Guide",
+      "models": "System 636 PVC (Class IIA), CPVC (Class IIB)",
+      "search": "IPEX System 636 flue gas venting installation guide ipexinc.com"
+    },
+    {
+      "id": "duravent-polypro",
+      "types": ["ULC S636 venting"],
+      "manufacturer": "DuraVent",
+      "title": "PolyPro Polypropylene Venting Installation Instructions",
+      "models": "PolyPro single wall, flex, concentric",
+      "url": "https://duravent.com/instructions/L273DWF_820014213_Install-Instructions_PolyPro.pdf"
+    },
+    {
+      "id": "centrotherm-innoflue",
+      "types": ["ULC S636 venting"],
+      "manufacturer": "Centrotherm",
+      "title": "InnoFlue Polypropylene Venting Installation Guide",
+      "models": "InnoFlue SW, Flex, concentric",
+      "search": "Centrotherm InnoFlue installation guide ULC S636 centrotherm.us.com"
+    },
+    {
+      "id": "rego-l545",
+      "types": ["Propane regulator", "Relief valve", "Propane tank / cylinder"],
+      "manufacturer": "RegO",
+      "title": "LP-Gas Serviceman's Manual (L-545)",
+      "models": "Regulators, pressure relief valves, ASME containers, leak testing",
+      "url": "https://www.regoproducts.com/content/dam/pes/pdfs/L-545_Servicemans_Manual.pdf"
+    },
+    {
+      "id": "fisher-r600",
+      "types": ["Propane regulator"],
+      "manufacturer": "Fisher (Emerson)",
+      "title": "R600 & HSRL Series LP-Gas Regulators Instruction Manual",
+      "models": "R622, R632, R642, R652, HSRL",
+      "url": "https://www.emerson.com/is/content/emerson/en/final-control/pressure-management/documents/manuals-r600-and-hsrl-series-lp-gas-regulators-instruction-manual-fisher.pdf"
+    },
+    {
+      "id": "fisher-r122h",
+      "types": ["Propane regulator"],
+      "manufacturer": "Fisher (Emerson)",
+      "title": "R122H, R222H, R222, R232A & R232E Series Instruction Manual",
+      "models": "R122H, R222H, R222, R232A, R232E",
+      "url": "https://www.emerson.com/is/content/emerson/en/final-control/pressure-management/documents/manuals-r122h-r222h-r222-r232a-and-r232e-series-instruction-manual-fisher-en.pdf"
+    },
+    {
+      "id": "fisher-912",
+      "types": ["Propane regulator"],
+      "manufacturer": "Fisher (Emerson)",
+      "title": "912H, 912N, Y200H, Y200N & R922N LP-Gas Regulators Instruction Manual",
+      "models": "912H, 912N, Y200H, Y200N, R922N",
+      "url": "https://www.emerson.com/is/content/emerson/en/final-control/pressure-management/documents/manuals-912h-912n-y200h-y200n-and-r922n-lp-gas-regulators-instruction-manual-fisher-en.pdf"
+    },
+    {
+      "id": "mec-regulators",
+      "types": ["Propane regulator"],
+      "manufacturer": "Marshall Excelsior (MEC)",
+      "title": "MEGR Regulator Installation Instructions",
+      "models": "MEGR series",
+      "search": "Marshall Excelsior MEGR regulator installation instructions mecoinc.com"
+    },
+    {
+      "id": "fisher-h100",
+      "types": ["Relief valve"],
+      "manufacturer": "Fisher (Emerson)",
+      "title": "H100 Series External Relief Valves Instruction Manual",
+      "models": "H100 series",
+      "url": "https://www.emerson.com/is/content/emerson/en/final-control/pressure-management/documents/manuals-h100-series-external-relief-valves-instruction-manual-fisher-en.pdf"
+    },
+    {
+      "id": "fisher-h-series",
+      "types": ["Relief valve"],
+      "manufacturer": "Fisher (Emerson)",
+      "title": "\"H\" Series Relief Valves Instruction Manual",
+      "models": "H series internal and external relief valves",
+      "url": "https://emerson.com/documents/automation/manuals-%E2%80%9Ch%E2%80%9D-series-relief-valves-instruction-manual-fisher-en-en-6109228.pdf"
+    },
+    {
+      "id": "mec-relief",
+      "types": ["Relief valve"],
+      "manufacturer": "Marshall Excelsior (MEC)",
+      "title": "Pressure Relief Valve Instructions",
+      "models": "MEC relief valves",
+      "search": "Marshall Excelsior MEC pressure relief valve installation instructions mecoinc.com"
+    },
+    {
+      "id": "manchester-asme",
+      "types": ["Propane tank / cylinder"],
+      "manufacturer": "Manchester Tank (McWane)",
+      "title": "Aboveground & Underground Horizontal ASME Domestic Propane Tanks",
+      "models": "ASME domestic propane tanks",
+      "url": "https://mcwane.com/upl/downloads/library/aboveground-underground-horizontal-asme-domestic-propane-tanks.pdf"
+    },
+    {
+      "id": "worthington-cylinders",
+      "types": ["Propane tank / cylinder"],
+      "manufacturer": "Worthington",
+      "title": "Propane Cylinder Safety & Installation Information",
+      "models": "TC/DOT propane cylinders",
+      "search": "Worthington propane cylinder installation and safety instructions PDF"
+    }
+  ]
+}

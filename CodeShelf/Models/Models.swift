@@ -1,21 +1,22 @@
 import Foundation
 
 /// Broad grouping used to organize the library and filter searches.
+/// Declared fuel-industry first: this order is used for Library sections and search chips.
 enum CodeCategory: String, Codable, CaseIterable, Identifiable, Sendable {
+    case gas
+    case oil
+    case manufacturer
+    case bulletin
     case building
     case residential
+    case mechanical
     case fire
     case electrical
     case plumbing
-    case mechanical
-    case gas
-    case oil
     case energy
     case accessibility
     case municipal
     case standard
-    case manufacturer
-    case bulletin
     case other
 
     var id: String { rawValue }
@@ -104,6 +105,8 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
     var modelNumbers: String = ""
     /// Manufacturer instructions: kind of equipment, e.g. "Furnace".
     var equipmentType: String = ""
+    /// ETag / Last-Modified of the downloaded copy, to spot newer versions online.
+    var sourceVersion: String = ""
 
     init(title: String, fileName: String) {
         self.title = title
@@ -127,7 +130,7 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id, title, shortName, category, jurisdiction, edition, fileName, fileSize
         case pageCount, indexedPages, ocrPages, dateAdded, lastPage, notes, sourceURL
-        case modelNumbers, equipmentType
+        case modelNumbers, equipmentType, sourceVersion
     }
 
     // Tolerant decoding so future versions can add fields without wiping the library.
@@ -149,6 +152,7 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
         notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
         modelNumbers = try c.decodeIfPresent(String.self, forKey: .modelNumbers) ?? ""
         equipmentType = try c.decodeIfPresent(String.self, forKey: .equipmentType) ?? ""
+        sourceVersion = try c.decodeIfPresent(String.self, forKey: .sourceVersion) ?? ""
         sourceURL = try c.decodeIfPresent(String.self, forKey: .sourceURL) ?? ""
     }
 }
@@ -156,14 +160,17 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
 /// Details entered for a manufacturer's manual.
 struct ManualInfo: Hashable, Sendable {
     static let equipmentTypes = [
-        "Furnace", "Boiler", "Water heater", "Oil burner", "Oil tank", "Fireplace / heater",
-        "Generator", "Air conditioner / heat pump", "HRV / ERV / ventilation", "Unit heater",
-        "Electrical panel / equipment", "Fuel dispenser / tank", "Other",
+        "CSST gas piping", "ULC S636 venting", "Propane regulator", "Relief valve", "Propane tank / cylinder",
+        "Furnace", "Boiler", "Water heater", "Unit heater", "Fireplace / heater", "Generator",
+        "Oil burner", "Oil tank", "Fuel dispenser / tank", "Air conditioner / heat pump",
+        "HRV / ERV / ventilation", "Electrical panel / equipment", "Other",
     ]
 
     var manufacturer: String = ""
     var models: String = ""
     var equipmentType: String = "Furnace"
+    /// The document's own title, when known (catalog entries).
+    var documentTitle: String = ""
 
     var isEmpty: Bool {
         manufacturer.trimmingCharacters(in: .whitespaces).isEmpty && models.trimmingCharacters(in: .whitespaces).isEmpty
@@ -177,6 +184,7 @@ struct ManualInfo: Hashable, Sendable {
 
     /// "Acme AF100, AF120 furnace installation instructions"
     var title: String {
+        if !documentTitle.isEmpty { return documentTitle }
         let base = [manufacturer.trimmingCharacters(in: .whitespaces), models.trimmingCharacters(in: .whitespaces)]
             .filter { !$0.isEmpty }
             .joined(separator: " ")

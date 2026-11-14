@@ -4,6 +4,7 @@ struct RootView: View {
     @Environment(LibraryStore.self) private var store
     @Environment(AppRouter.self) private var router
     @Environment(UpdatesStore.self) private var updates
+    @Environment(EquipmentLibrary.self) private var equipment
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -50,8 +51,35 @@ struct RootView: View {
         } message: {
             Text(store.alertMessage ?? "")
         }
+        .task {
+            await Notifier.requestPermissionIfNeeded()
+            await runAutomaticTasks()
+        }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { store.saveNow() }
+            switch phase {
+            case .active:
+                Task { await runAutomaticTasks() }
+            case .background:
+                store.saveNow()
+                BackgroundRefresh.schedule()
+            default:
+                store.saveNow()
+            }
+        }
+    }
+
+    /// New TSSA / CSA / e-Laws items and newer manufacturer instructions, checked when the app opens.
+    private func runAutomaticTasks() async {
+        let terms = store.libraryTerms
+        let updates = self.updates
+        // Run the bulletin check alongside the downloads instead of waiting for it.
+        Task { await updates.autoCheckIfDue(libraryTerms: terms) }
+        let changed = await equipment.syncIfDue(store: store)
+        if !changed.isEmpty {
+            await Notifier.post(
+                title: "\(changed.count) installation instruction\(changed.count == 1 ? "" : "s") downloaded or updated",
+                body: changed.prefix(3).joined(separator: "\n")
+            )
         }
     }
 

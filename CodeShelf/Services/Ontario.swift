@@ -36,6 +36,42 @@ enum Ontario {
 
     static let laws: [OntarioLaw] = [
         OntarioLaw(
+            id: "gaseous-fuels",
+            name: "Gaseous Fuels",
+            citation: "O. Reg. 212/01",
+            detail: "Natural gas and propane appliances and piping; adopts CSA B149 through TSSA's code adoption document",
+            address: "https://www.ontario.ca/laws/regulation/010212",
+            category: .gas,
+            shortName: "Gaseous Fuels Reg. 212/01"
+        ),
+        OntarioLaw(
+            id: "propane-storage",
+            name: "Propane Storage and Handling",
+            citation: "O. Reg. 211/01",
+            detail: "Storage, handling, transportation and transfer of propane (CSA B149.2)",
+            address: "https://www.ontario.ca/laws/regulation/010211",
+            category: .gas,
+            shortName: "Propane Reg. 211/01"
+        ),
+        OntarioLaw(
+            id: "fuel-oil",
+            name: "Fuel Oil",
+            citation: "O. Reg. 213/01",
+            detail: "Furnace / heating oil equipment and tanks; adopts CSA B139 through TSSA's Fuel Oil Code Adoption Document",
+            address: "https://www.ontario.ca/laws/regulation/010213",
+            category: .oil,
+            shortName: "Fuel Oil Reg. 213/01"
+        ),
+        OntarioLaw(
+            id: "liquid-fuels",
+            name: "Liquid Fuels",
+            citation: "O. Reg. 217/01",
+            detail: "Gasoline, diesel and associated products — bulk plants, retail and private outlets, marinas; adopts TSSA's Liquid Fuels Handling Code",
+            address: "https://www.ontario.ca/laws/regulation/010217",
+            category: .oil,
+            shortName: "Liquid Fuels Reg. 217/01"
+        ),
+        OntarioLaw(
             id: "obc-reg",
             name: "Building Code",
             citation: "O. Reg. 163/24",
@@ -79,42 +115,6 @@ enum Ontario {
             address: "https://www.ontario.ca/laws/regulation/990164",
             category: .electrical,
             shortName: "OESC Reg. 164/99"
-        ),
-        OntarioLaw(
-            id: "gaseous-fuels",
-            name: "Gaseous Fuels",
-            citation: "O. Reg. 212/01",
-            detail: "Natural gas and propane appliances and piping; adopts CSA B149 through TSSA's code adoption document",
-            address: "https://www.ontario.ca/laws/regulation/010212",
-            category: .gas,
-            shortName: "Gaseous Fuels Reg. 212/01"
-        ),
-        OntarioLaw(
-            id: "propane-storage",
-            name: "Propane Storage and Handling",
-            citation: "O. Reg. 211/01",
-            detail: "Storage, handling, transportation and transfer of propane (CSA B149.2)",
-            address: "https://www.ontario.ca/laws/regulation/010211",
-            category: .gas,
-            shortName: "Propane Reg. 211/01"
-        ),
-        OntarioLaw(
-            id: "fuel-oil",
-            name: "Fuel Oil",
-            citation: "O. Reg. 213/01",
-            detail: "Furnace / heating oil equipment and tanks; adopts CSA B139 through TSSA's Fuel Oil Code Adoption Document",
-            address: "https://www.ontario.ca/laws/regulation/010213",
-            category: .oil,
-            shortName: "Fuel Oil Reg. 213/01"
-        ),
-        OntarioLaw(
-            id: "liquid-fuels",
-            name: "Liquid Fuels",
-            citation: "O. Reg. 217/01",
-            detail: "Gasoline, diesel and associated products — bulk plants, retail and private outlets, marinas; adopts TSSA's Liquid Fuels Handling Code",
-            address: "https://www.ontario.ca/laws/regulation/010217",
-            category: .oil,
-            shortName: "Liquid Fuels Reg. 217/01"
         ),
     ]
 

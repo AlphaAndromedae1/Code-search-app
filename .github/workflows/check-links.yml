@@ -1,0 +1,26 @@
+name: Check links
+
+# Verifies the manufacturer PDFs and update sources the app relies on.
+# Runs on Linux (cheap) — weekly, when the lists change, or by hand.
+on:
+  schedule:
+    - cron: "17 9 * * 1"
+  push:
+    paths:
+      - "CodeShelf/Resources/FuelCatalog.json"
+      - "CodeShelf/Services/UpdatesStore.swift"
+      - "CodeShelf/Services/Ontario.swift"
+      - "Tests/check_links.py"
+      - ".github/workflows/check-links.yml"
+  workflow_dispatch:
+
+jobs:
+  check-links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Check links
+        run: python3 Tests/check_links.py

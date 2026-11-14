@@ -113,7 +113,7 @@ jobs:
           mkdir -p "$DATA/tmp/fixtures"
           cp Tests/Fixtures/*.pdf "$DATA/tmp/fixtures/"
           F="$DATA/tmp/fixtures"
-          xcrun simctl launch "$UDID" "$BUNDLE" -importOnLaunch "$F/OESC 2024 sample.pdf|$F/2-7-26.pdf|$F/CSA B139-24 Installation code for oil-burning equipment.pdf|$F/Acme AF100 Furnace Installation Instructions.pdf"
+          xcrun simctl launch "$UDID" "$BUNDLE" -disableAutomation YES -importOnLaunch "$F/OESC 2024 sample.pdf|$F/2-7-26.pdf|$F/CSA B139-24 Installation code for oil-burning equipment.pdf|$F/Acme AF100 Furnace Installation Instructions.pdf|$F/CSA B149.1-25 protected.pdf"
 
       - name: Verify import, indexing and search
         run: python3 Tests/smoke_check.py "$DATA/Library/Application Support/CodeShelf"
@@ -121,7 +121,7 @@ jobs:
       - name: Relaunch (reloads the saved library) and confirm it stays running
         run: |
           xcrun simctl terminate "$UDID" com.personal.codeshelf || true
-          xcrun simctl launch "$UDID" com.personal.codeshelf
+          xcrun simctl launch "$UDID" com.personal.codeshelf -disableAutomation YES
           sleep 15
           if xcrun simctl spawn "$UDID" launchctl list | grep -q "com.personal.codeshelf"; then
             echo "CodeShelf is running after relaunch"
@@ -129,6 +129,13 @@ jobs:
             echo "::error::CodeShelf is not running after relaunch"
             exit 1
           fi
+
+      - name: Fuel Equipment Library downloads on iOS (report)
+        continue-on-error: true
+        run: |
+          xcrun simctl terminate "$UDID" com.personal.codeshelf || true
+          xcrun simctl launch "$UDID" com.personal.codeshelf
+          python3 Tests/equipment_check.py "$DATA/Library/Application Support/CodeShelf" CodeShelf/Resources/FuelCatalog.json
 
       - name: Screenshot
         if: always()

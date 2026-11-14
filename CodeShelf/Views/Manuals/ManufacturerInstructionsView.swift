@@ -19,6 +19,30 @@ struct ManufacturerInstructionsView: View {
         NavigationStack {
             Form {
                 Section {
+                    NavigationLink {
+                        EquipmentLibraryView()
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label("Fuel Equipment Library", systemImage: "shippingbox.fill")
+                                .font(.headline)
+                            Text("CSST, ULC S636 venting, propane regulators, relief valves, tanks & cylinders")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } footer: {
+                    Text("Downloaded from the manufacturers and kept up to date automatically.")
+                }
+
+                if store.importsInFlight > 0 || !store.importResults.isEmpty {
+                    Section {
+                        ImportResultsBanner()
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                    }
+                }
+
+                Section {
                     TextField("Manufacturer (e.g. Carrier, Lennox, Beckett)", text: $info.manufacturer)
                         .textInputAutocapitalization(.words)
                     TextField("Model number(s)", text: $info.models, prompt: Text("e.g. 59SC5A080, 59SC5A100"))

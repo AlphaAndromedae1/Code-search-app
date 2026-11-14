@@ -7,6 +7,7 @@ struct LibraryView: View {
     @State private var showSettings = false
     @State private var showMunicipal = false
     @State private var showManuals = false
+    @State private var showEquipment = false
     @State private var editingBook: Book? = nil
     @State private var pendingDelete: Book? = nil
     @State private var filter = ""
@@ -19,6 +20,9 @@ struct LibraryView: View {
                 } else {
                     bookList
                 }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                ImportResultsBanner()
             }
             .navigationTitle("Library")
             .toolbar {
@@ -46,6 +50,11 @@ struct LibraryView: View {
                         } label: {
                             Label("Manufacturer Instructions…", systemImage: "wrench.and.screwdriver")
                         }
+                        Button {
+                            showEquipment = true
+                        } label: {
+                            Label("Fuel Equipment Library…", systemImage: "shippingbox")
+                        }
                     } label: {
                         Label("Add", systemImage: "plus")
                     }
@@ -54,9 +63,10 @@ struct LibraryView: View {
             .fileImporter(isPresented: $showImporter, allowedContentTypes: [.pdf], allowsMultipleSelection: true) { result in
                 switch result {
                 case .success(let urls):
+                    store.logImport("File picker returned \(urls.count) file(s)")
                     Task { await store.importPDFs(from: urls) }
                 case .failure(let error):
-                    store.alertMessage = error.localizedDescription
+                    store.reportPickerFailure(error)
                 }
             }
             .sheet(item: $editingBook) { book in
@@ -70,6 +80,16 @@ struct LibraryView: View {
             }
             .sheet(isPresented: $showManuals) {
                 ManufacturerInstructionsView()
+            }
+            .sheet(isPresented: $showEquipment) {
+                NavigationStack {
+                    EquipmentLibraryView()
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { showEquipment = false }
+                            }
+                        }
+                }
             }
             .confirmationDialog("Delete this code book?", isPresented: deleteBinding, titleVisibility: .visible, presenting: pendingDelete) { book in
                 Button("Delete “\(book.displayName)”", role: .destructive) {
@@ -95,7 +115,7 @@ struct LibraryView: View {
         ContentUnavailableView {
             Label("No Code Books Yet", systemImage: "books.vertical")
         } description: {
-            Text("Import the code book PDFs you own — OBC, OESC, CE Code, National Codes, fire, plumbing, municipal by-laws and more. Each one is indexed on this device so you can search them all at once.")
+            Text("Import the code books you own — CSA B149.1, B149.2, B139, TSSA code adoption documents, OBC and more. Manufacturer installation instructions for CSST, S636 venting, regulators, relief valves and tanks are downloaded automatically from the Fuel Equipment Library.")
         } actions: {
             Button {
                 showImporter = true
@@ -251,5 +271,48 @@ struct BookRow: View {
         parts.append("\(book.pageCount) pages")
         if book.ocrPages > 0 { parts.append("\(book.ocrPages) scanned") }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// The outcome of the last import, shown at the top of the Library until dismissed.
+struct ImportResultsBanner: View {
+    @Environment(LibraryStore.self) private var store
+
+    var body: some View {
+        if store.importsInFlight > 0 || !store.importResults.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                if store.importsInFlight > 0 {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Importing \(store.importsInFlight) file\(store.importsInFlight == 1 ? "" : "s")…")
+                            .font(.subheadline.weight(.medium))
+                    }
+                }
+                ForEach(store.importResults) { result in
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: result.succeeded ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .foregroundStyle(result.succeeded ? Color.green : Color.orange)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(result.fileName)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(2)
+                            Text(result.message)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                if !store.importResults.isEmpty && store.importsInFlight == 0 {
+                    Button("Dismiss") { store.dismissImportResults() }
+                        .font(.footnote.weight(.semibold))
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal)
+            .padding(.vertical, 6)
+        }
     }
 }

@@ -78,6 +78,16 @@ final class UpdatesStore {
     private(set) var progressText = ""
     private(set) var lastProblems: [String] = []
 
+    /// One store for the whole app (the background refresh task uses it too).
+    static let shared = UpdatesStore()
+
+    /// TSSA, CSA and e-Laws fuel sources followed automatically.
+    static let fuelDefaults = [
+        "tssa-reg-docs", "tssa-fuels-news", "tssa-fuel-oil", "tssa-fuels-search", "csa-b149-search",
+        "elaws-gaseous-fuels", "elaws-propane", "elaws-fuel-oil", "elaws-liquid-fuels",
+    ]
+    private static let fuelDefaultsKey = "fuelSourcesFollowedV1"
+
     init() {
         if let data = try? Data(contentsOf: AppPaths.updatesFile),
            let decoded = try? JSONDecoder().decode(UpdatesData.self, from: data) {
@@ -85,6 +95,20 @@ final class UpdatesStore {
             items = decoded.items
             lastCheck = decoded.lastCheck
         }
+        followFuelDefaultsIfNeeded()
+    }
+
+    /// Follows the TSSA/CSA/e-Laws fuel sources once, so updates work without any setup.
+    private func followFuelDefaultsIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: UpdatesStore.fuelDefaultsKey) else { return }
+        let catalog = UpdatesStore.catalog(city: "")
+        for id in UpdatesStore.fuelDefaults {
+            if let suggestion = catalog.first(where: { $0.id == id }), !isFollowing(id) {
+                followed.append(suggestion.source)
+            }
+        }
+        UserDefaults.standard.set(true, forKey: UpdatesStore.fuelDefaultsKey)
+        save()
     }
 
     private func save() {
@@ -156,20 +180,29 @@ final class UpdatesStore {
     // MARK: Checking
 
     /// Opens each followed listing page once and records links that weren't there last time.
-    func checkAll(libraryTerms: [String]) async {
-        guard !isChecking else { return }
+    /// - Parameter allowWebView: false in the background, where only plain page downloads are used.
+    /// - Returns: the new items found.
+    @discardableResult
+    func checkAll(libraryTerms: [String], allowWebView: Bool = true) async -> [UpdateItem] {
+        guard !isChecking else { return [] }
         isChecking = true
         lastProblems = []
         defer {
             isChecking = false
             progressText = ""
         }
+        let before = Set(items.map(\.id))
         let targets = followed.filter(\.checkable)
-        let loader = PageLinkLoader()
+        var loader: PageLinkLoader?
         for (offset, source) in targets.enumerated() {
             progressText = "Checking \(source.name) (\(offset + 1) of \(targets.count))…"
             guard let url = URL(string: source.url) else { continue }
-            let links = await loader.links(at: url)
+            var links = await HTMLLinkFetcher.links(at: url)
+            if links.isEmpty && allowWebView {
+                // Pages built with JavaScript need a real browser engine.
+                if loader == nil { loader = PageLinkLoader() }
+                links = await loader?.links(at: url) ?? []
+            }
             if links.isEmpty {
                 lastProblems.append(source.name)
                 continue
@@ -178,6 +211,31 @@ final class UpdatesStore {
         }
         lastCheck = Date()
         save()
+        return items.filter { !before.contains($0.id) }
+    }
+
+    /// Checks when the app opens if the last check is more than 6 hours old.
+    func autoCheckIfDue(libraryTerms: [String]) async {
+        guard AppSettings.autoCheckEnabled, !AppSettings.automationDisabled else { return }
+        if let lastCheck, Date().timeIntervalSince(lastCheck) < 6 * 3600 { return }
+        let found = await checkAll(libraryTerms: libraryTerms)
+        await notify(found)
+    }
+
+    func backgroundRefresh(libraryTerms: [String]) async {
+        let found = await checkAll(libraryTerms: libraryTerms, allowWebView: false)
+        await notify(found)
+    }
+
+    private func notify(_ found: [UpdateItem]) async {
+        guard !found.isEmpty else { return }
+        let sorted = found.sorted { $0.tags.count > $1.tags.count }
+        let lines = sorted.prefix(3).map(\.title).joined(separator: "\n")
+        let more = found.count > 3 ? "\n+\(found.count - 3) more" : ""
+        await Notifier.post(
+            title: "\(found.count) new TSSA / CSA update\(found.count == 1 ? "" : "s")",
+            body: lines + more
+        )
     }
 
     /// Called when the user opens a followed page in the browser.
@@ -185,7 +243,11 @@ final class UpdatesStore {
         guard let source = self.source(id: sourceID), source.checkable,
               LibraryStore.sourceKey(pageURL.absoluteString) == LibraryStore.sourceKey(source.url)
         else { return }
-        let links = await PageLinkLoader.extractLinks(from: webView)
+        // Use the same page download as automatic checks so both see the same links.
+        var links = await HTMLLinkFetcher.links(at: pageURL)
+        if links.isEmpty {
+            links = await PageLinkLoader.extractLinks(from: webView)
+        }
         guard !links.isEmpty else { return }
         apply(links, to: sourceID, libraryTerms: libraryTerms)
     }
@@ -279,6 +341,70 @@ final class UpdatesStore {
                    "LIQUID FUELS", "GASOLINE", "DIESEL", "PETROLEUM"]
 
         var list: [SourceSuggestion] = [
+            // Gas & propane — TSSA, e-Laws, CSA
+            SourceSuggestion(
+                source: page("tssa-reg-docs", "TSSA — Advisories, bulletins & code adoption documents",
+                             "TSSA's regulatory document list: fuels safety advisories, director's orders and code adoption documents (B149, B139 and more)",
+                             "https://www.tssa.org/regulatory-document-search"),
+                keywords: gas + oil, categories: [.gas, .oil, .manufacturer]),
+            SourceSuggestion(
+                source: page("tssa-fuels-news", "TSSA — Fuels news & notices",
+                               "Technical Standards and Safety Authority fuels safety news",
+                               "https://www.tssa.org/taxonomy/term/126"),
+                keywords: gas, categories: [.gas]),
+            SourceSuggestion(
+                source: search("tssa-fuels-search", "Search: TSSA code adoption documents & advisories",
+                               "Web search for TSSA fuels code adoption document amendments and B149 interpretation advisories",
+                               query: "TSSA fuels code adoption document amendment B149 advisory"),
+                keywords: gas, categories: [.gas]),
+            SourceSuggestion(
+                source: page("elaws-gaseous-fuels", "e-Laws — Gaseous Fuels (O. Reg. 212/01)",
+                               "New amending regulations for natural gas and propane installations appear here",
+                               "https://www.ontario.ca/laws/regulation/010212"),
+                keywords: gas, categories: [.gas]),
+            SourceSuggestion(
+                source: page("elaws-propane", "e-Laws — Propane Storage and Handling (O. Reg. 211/01)",
+                               "New amending regulations for propane storage and handling appear here",
+                               "https://www.ontario.ca/laws/regulation/010211"),
+                keywords: gas, categories: [.gas]),
+            SourceSuggestion(
+                source: search("csa-b149-search", "Search: CSA B149 gas & propane code updates",
+                               "Web search for new editions, amendments and interpretations of CSA B149.1 and B149.2",
+                               query: "CSA B149.1 B149.2 natural gas propane installation code amendment new edition"),
+                keywords: gas, categories: [.gas]),
+
+            // Fuel oil & petroleum — TSSA, e-Laws, CSA, ERO
+            SourceSuggestion(
+                source: page("tssa-fuel-oil", "TSSA — Fuel oil",
+                             "TSSA's fuel oil program: code adoption document amendments and advisories",
+                             "https://tssa.org/fuel-oil"),
+                keywords: oil, categories: [.oil]),
+            SourceSuggestion(
+                source: page("elaws-fuel-oil", "e-Laws — Fuel Oil (O. Reg. 213/01)",
+                             "New amending regulations for fuel oil equipment and tanks appear here",
+                             "https://www.ontario.ca/laws/regulation/010213"),
+                keywords: oil, categories: [.oil]),
+            SourceSuggestion(
+                source: page("elaws-liquid-fuels", "e-Laws — Liquid Fuels (O. Reg. 217/01)",
+                             "New amending regulations for gasoline and diesel facilities appear here",
+                             "https://www.ontario.ca/laws/regulation/010217"),
+                keywords: oil, categories: [.oil]),
+            SourceSuggestion(
+                source: search("csa-b139-search", "Search: CSA B139 oil-burning equipment code updates",
+                               "Web search for new editions and Ontario amendments of CSA B139",
+                               query: "CSA B139 installation code oil-burning equipment Ontario amendment code adoption document"),
+                keywords: oil, categories: [.oil]),
+            SourceSuggestion(
+                source: search("tssa-lfhc-search", "Search: Liquid Fuels Handling Code amendments",
+                               "Web search for TSSA Liquid Fuels Handling Code amendments, director's orders and advisories",
+                               query: "TSSA Liquid Fuels Handling Code amendment code adoption document advisory"),
+                keywords: oil, categories: [.oil]),
+            SourceSuggestion(
+                source: search("ero-fuels-search", "Search: proposed fuels code changes (ERO)",
+                               "Proposed TSSA code adoption document changes posted for comment on the Environmental Registry of Ontario",
+                               query: "Environmental Registry of Ontario TSSA code adoption document amendment proposal fuel"),
+                keywords: gas + oil, categories: [.gas, .oil]),
+
             // Electrical — ESA, CSA, e-Laws
             SourceSuggestion(
                 source: page("esa-oesc", "ESA — Ontario Electrical Safety Code",
@@ -344,65 +470,6 @@ final class UpdatesStore {
                                "Web search for new Office of the Fire Marshal technical guidelines and communiqués",
                                query: "Ontario Office of the Fire Marshal technical guideline communiqué Fire Code"),
                 keywords: fire, categories: [.fire]),
-
-            // Gas & propane — TSSA, e-Laws, CSA
-            SourceSuggestion(
-                source: page("tssa-fuels-news", "TSSA — Fuels news & notices",
-                               "Technical Standards and Safety Authority fuels safety news",
-                               "https://www.tssa.org/taxonomy/term/126"),
-                keywords: gas, categories: [.gas]),
-            SourceSuggestion(
-                source: search("tssa-fuels-search", "Search: TSSA code adoption documents & advisories",
-                               "Web search for TSSA fuels code adoption document amendments and B149 interpretation advisories",
-                               query: "TSSA fuels code adoption document amendment B149 advisory"),
-                keywords: gas, categories: [.gas]),
-            SourceSuggestion(
-                source: page("elaws-gaseous-fuels", "e-Laws — Gaseous Fuels (O. Reg. 212/01)",
-                               "New amending regulations for natural gas and propane installations appear here",
-                               "https://www.ontario.ca/laws/regulation/010212"),
-                keywords: gas, categories: [.gas]),
-            SourceSuggestion(
-                source: page("elaws-propane", "e-Laws — Propane Storage and Handling (O. Reg. 211/01)",
-                               "New amending regulations for propane storage and handling appear here",
-                               "https://www.ontario.ca/laws/regulation/010211"),
-                keywords: gas, categories: [.gas]),
-            SourceSuggestion(
-                source: search("csa-b149-search", "Search: CSA B149 gas & propane code updates",
-                               "Web search for new editions, amendments and interpretations of CSA B149.1 and B149.2",
-                               query: "CSA B149.1 B149.2 natural gas propane installation code amendment new edition"),
-                keywords: gas, categories: [.gas]),
-
-            // Fuel oil & petroleum — TSSA, e-Laws, CSA, ERO
-            SourceSuggestion(
-                source: page("tssa-fuel-oil", "TSSA — Fuel oil",
-                             "TSSA's fuel oil program: code adoption document amendments and advisories",
-                             "https://tssa.org/fuel-oil"),
-                keywords: oil, categories: [.oil]),
-            SourceSuggestion(
-                source: page("elaws-fuel-oil", "e-Laws — Fuel Oil (O. Reg. 213/01)",
-                             "New amending regulations for fuel oil equipment and tanks appear here",
-                             "https://www.ontario.ca/laws/regulation/010213"),
-                keywords: oil, categories: [.oil]),
-            SourceSuggestion(
-                source: page("elaws-liquid-fuels", "e-Laws — Liquid Fuels (O. Reg. 217/01)",
-                             "New amending regulations for gasoline and diesel facilities appear here",
-                             "https://www.ontario.ca/laws/regulation/010217"),
-                keywords: oil, categories: [.oil]),
-            SourceSuggestion(
-                source: search("csa-b139-search", "Search: CSA B139 oil-burning equipment code updates",
-                               "Web search for new editions and Ontario amendments of CSA B139",
-                               query: "CSA B139 installation code oil-burning equipment Ontario amendment code adoption document"),
-                keywords: oil, categories: [.oil]),
-            SourceSuggestion(
-                source: search("tssa-lfhc-search", "Search: Liquid Fuels Handling Code amendments",
-                               "Web search for TSSA Liquid Fuels Handling Code amendments, director's orders and advisories",
-                               query: "TSSA Liquid Fuels Handling Code amendment code adoption document advisory"),
-                keywords: oil, categories: [.oil]),
-            SourceSuggestion(
-                source: search("ero-fuels-search", "Search: proposed fuels code changes (ERO)",
-                               "Proposed TSSA code adoption document changes posted for comment on the Environmental Registry of Ontario",
-                               query: "Environmental Registry of Ontario TSSA code adoption document amendment proposal fuel"),
-                keywords: gas + oil, categories: [.gas, .oil]),
 
             // National model codes — only if the library has them
             SourceSuggestion(

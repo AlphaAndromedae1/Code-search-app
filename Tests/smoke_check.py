@@ -25,7 +25,8 @@ deadline = time.time() + 180
 while time.time() < deadline:
     try:
         books = json.loads((root / "library.json").read_text())["books"]
-        if len(books) >= 4 and all(b["pageCount"] > 0 and b["indexedPages"] >= b["pageCount"] for b in books):
+        log_done = (root / "import-log.txt").exists() and "protected.pdf: FAILED" in (root / "import-log.txt").read_text()
+        if len(books) >= 4 and log_done and all(b["pageCount"] > 0 and b["indexedPages"] >= b["pageCount"] for b in books):
             break
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         pass
@@ -74,6 +75,15 @@ check(oil_code is not None and clause_hits == [(oil_code["id"],)], "'7.3.1' find
 
 manual_hits = db.execute("SELECT book_id FROM pages WHERE pages MATCH 'clearance* combustible*'").fetchall()
 check(manual is not None and manual_hits == [(manual["id"],)], "'clearance combustible' finds the furnace manual")
+
+# The FileOpen-protected fixture must be refused with a clear explanation, not silently.
+log_text = (root / "import-log.txt").read_text() if (root / "import-log.txt").exists() else ""
+print("Import log (last lines):")
+for line in log_text.splitlines()[-12:]:
+    print("  " + line)
+check("protected.pdf: FAILED" in log_text and "FileOpen" in log_text,
+      "DRM-protected PDF refused with a FileOpen explanation")
+check(not any("protected" in b["title"] for b in books), "DRM-protected PDF was not added to the library")
 
 if failures:
     print(f"\n{len(failures)} check(s) failed")
