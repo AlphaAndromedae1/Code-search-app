@@ -12,7 +12,7 @@ struct ToolsView: View {
                     NavigationLink(value: ToolRoute.pipeSizing) {
                         ToolRow(
                             title: "Pipe Sizing",
-                            subtitle: "Steel and copper · natural gas and propane · low pressure, 2, 5 and 10 psi",
+                            subtitle: "CSA B149.1 Annex A method · steel and Type K copper · 7\" w.c. to 20 psi",
                             symbol: "ruler"
                         )
                     }

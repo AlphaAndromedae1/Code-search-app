@@ -108,11 +108,25 @@ struct CodeShelfApp: App {
 
     #if DEBUG
     private func calcProbe() -> [String: Any] {
-        let lowNG = GasSystem.presets.first { $0.id == "ng-7wc-05" }!
-        let propane10 = GasSystem.presets.first { $0.id == "lp-10psi" }!
-        let steel10 = PipeSizing.capacities(material: .steelSch40, lengthFeet: 10, system: lowNG).map(\.cfh)
-        let steel100 = PipeSizing.capacities(material: .steelSch40, lengthFeet: 100, system: lowNG).map(\.cfh)
-        let propaneMBH = PipeSizing.capacities(material: .steelSch40, lengthFeet: 10, system: propane10).map { $0.btuPerHour / 1000 }
+        func preset(_ id: String) -> GasSystem { GasSystem.presets.first { $0.id == id }! }
+        func row(_ id: String, _ material: PipeMaterial, _ length: Double, _ units: UnitSystem = .imperial) -> [Int] {
+            PipeSizing.capacities(material: material, length: length, units: units, system: preset(id)).map(\.capacity)
+        }
+        // A worked example: 150 MBH over a 45 ft run at 7" w.c. (Table A.1): read at the 50 ft row.
+        let example = PipeSizing.capacities(material: .steelSch40, length: 45, units: .imperial, system: preset("ng-a1"))
+        let pick = PipeSizing.recommended(example, load: 150)
+        // 5 psi (no fittings allowance): 95 ft plus two 90° elbows pushes 1/2" to the 100 ft row and 4" to 125 ft.
+        var elbows = FittingCounts()
+        elbows.elbows90 = 2
+        let withFittings = PipeSizing.capacities(material: .steelSch40, length: 95, units: .imperial, system: preset("ng-a5"), fittings: elbows)
+        let pipe: [String: Any] = [
+            "A.1 10ft": row("ng-a1", .steelSch40, 10), "A.3 10ft": row("ng-a3", .steelSch40, 10),
+            "A.5 10ft": row("ng-a5", .steelSch40, 10), "A.7 10ft": row("ng-a7", .steelSch40, 10),
+            "A.8 10ft": row("ng-a1", .copperK, 10), "A.10 10ft": row("ng-a3", .copperK, 10),
+            "A.2b 3m": row("ng-a2", .steelSch40, 3, .metric), "A.3b 3m": row("ng-a3", .steelSch40, 3, .metric),
+            "exampleSize": pick?.size ?? "", "exampleRow": pick?.rowLength ?? 0,
+            "fittingRows": withFittings.map(\.rowLength),
+        ]
         var csst: [String: Any] = ["tables": CSSTSizing.tables.count]
         if let table = CSSTSizing.tables.first(where: { $0.table == "7-1" }),
            let result = CSSTSizing.size(table: table, lengthFeet: 28, extraFittings: 2, loadBTU: 100_000) {
@@ -123,7 +137,7 @@ struct CodeShelfApp: App {
            let result = CSSTSizing.size(table: table, lengthFeet: 100, extraFittings: 0, loadBTU: 400_000) {
             csst["propane10psiSize"] = result.recommended?.size ?? ""
         }
-        return ["steelNG10ft": steel10, "steelNG100ft": steel100, "steelLP10psi10ftMBH": propaneMBH, "csst": csst]
+        return ["pipe": pipe, "csst": csst]
     }
 
     private func writeProbe(_ name: String, _ object: [String: Any]) {

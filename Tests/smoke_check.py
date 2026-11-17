@@ -166,14 +166,30 @@ try:
 except (FileNotFoundError, json.JSONDecodeError):
     calc = {}
 print("  calculators:", json.dumps(calc))
-steel10 = calc.get("steelNG10ft", [])
-steel100 = calc.get("steelNG100ft", [])
-check(len(steel10) >= 4 and abs(steel10[0] - 172) <= 4 and abs(steel10[1] - 360) <= 8 and abs(steel10[2] - 678) <= 14,
-      "natural gas, 1/2-3/4-1 in. steel at 10 ft, 0.5 in. w.c. drop ≈ 172 / 360 / 678 ft³/h (code table values)")
-check(len(steel100) >= 3 and abs(steel100[0] - 50) <= 2 and abs(steel100[1] - 105) <= 3 and abs(steel100[2] - 198) <= 5,
-      "natural gas, steel at 100 ft ≈ 50 / 105 / 198 ft³/h (code table values)")
-lp = calc.get("steelLP10psi10ftMBH", [])
-check(len(lp) >= 1 and 3300 <= lp[0] <= 3450, "propane 10 psi, 1 psi drop, 1/2 in. steel at 10 ft ≈ 3,370 MBH (equation 4-2)")
+pipe = calc.get("pipe", {})
+
+
+def near(values, expected):
+    return len(values) >= len(expected) and all(abs(v - e) <= 1 for v, e in zip(values, expected))
+
+
+# Spot checks against CSA B149.1-20 Annex A (first row of each table, smallest sizes), ±1 for rounding.
+for key, expected, what in [
+    ("A.1 10ft", [156, 326, 614, 1261], "7 in. w.c., 0.5 in. drop, steel"),
+    ("A.3 10ft", [1440, 3012, 5673], "2 psi, 1 psi drop, steel"),
+    ("A.5 10ft", [2800, 5855, 11028], "5 psi, 2.5 psi drop, steel (no fittings allowance)"),
+    ("A.7 10ft", [7669, 16036, 30207], "20 psi, 10 psi drop, steel"),
+    ("A.8 10ft", [24, 50, 101], "7 in. w.c., 0.5 in. drop, Type K tubing"),
+    ("A.10 10ft", [222, 458, 933], "2 psi, 1 psi drop, Type K tubing"),
+    ("A.2b 3m", [67, 141, 265], "metric: 1.75-3.5 kPa, 250 Pa drop, steel, kW"),
+    ("A.3b 3m", [430, 899, 1693], "metric: 14 kPa, 7 kPa drop, steel, kW"),
+]:
+    check(near(pipe.get(key, []), expected), f"pipe sizing matches B149.1 Table {key.split()[0]} ({what}): {pipe.get(key, [])[:len(expected)]}")
+check(pipe.get("exampleSize") == '1"' and pipe.get("exampleRow") == 50,
+      "150 MBH over 45 ft at 7 in. w.c. reads the 50 ft row and picks 1 in. (A.3.5 / A.3.7)")
+rows = pipe.get("fittingRows", [])
+check(len(rows) == 9 and rows[0] == 100 and rows[-1] == 125,
+      "5 psi table: two 90-degree elbows (Table A.16) move 1/2 in. to the 100 ft row and 4 in. to 125 ft")
 csst = calc.get("csst", {})
 check(csst.get("tables") == 20, "all 20 Gastite CSST tables load")
 check(csst.get("size") == '1"' and csst.get("column") == 40,

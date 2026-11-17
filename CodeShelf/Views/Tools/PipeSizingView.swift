@@ -1,91 +1,126 @@
 import SwiftUI
 
-/// Sizes steel pipe or copper tubing for natural gas or propane by the longest-length method.
+/// Sizes steel pipe or copper tubing by the method of CSA B149.1 Annex A (longest-length, tables A.1–A.14).
 struct PipeSizingView: View {
     @State private var gas: FuelGas = .natural
+    @State private var units: UnitSystem = .imperial
     @State private var systemID = GasSystem.presets(for: .natural)[0].id
     @State private var customInlet: Double? = 7
     @State private var customInletUnit: PressureUnit = .inchesWC
     @State private var customDrop: Double? = 0.5
     @State private var customDropUnit: PressureUnit = .inchesWC
+    @State private var customFittings = true
     @State private var material: PipeMaterial = .steelSch40
     @State private var length: Double? = 50
-    @State private var lengthUnit: LengthUnit = .feet
+    @State private var fittings = FittingCounts()
+    @State private var extraLength: Double? = nil
     @State private var loads = [LoadEntry(name: "Furnace", value: 100_000), LoadEntry(name: "Water heater", value: 40_000)]
     @State private var loadUnit: LoadUnit = .btu
     @FocusState private var editing: Bool
 
     var body: some View {
         Form {
-            Section {
-                Picker("Gas", selection: $gas) {
-                    ForEach(FuelGas.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .onChange(of: gas) { _, newGas in
-                    systemID = GasSystem.presets(for: newGas)[0].id
-                    customInlet = newGas == .natural ? 7 : 11
-                }
-
-                Picker("Pressure", selection: $systemID) {
-                    ForEach(GasSystem.presets(for: gas)) { preset in
-                        Text(preset.title).tag(preset.id)
-                    }
-                    Text("Custom…").tag("custom")
-                }
-                if systemID == "custom" {
-                    pressureField("Supply pressure", value: $customInlet, unit: $customInletUnit)
-                    pressureField("Allowed drop", value: $customDrop, unit: $customDropUnit)
-                }
-            } header: {
-                Text("System")
-            } footer: {
-                if let system {
-                    Text("\(system.note). \(system.usesLowPressureEquation ? "Low-pressure equation" : "High-pressure equation") · \(gas.label) at \(Format.number(gas.btuPerCubicFoot)) BTU/ft³.")
-                }
+            systemSection
+            pipingSection
+            if let system, !system.includesFittings {
+                fittingsSection
             }
-
-            Section {
-                Picker("Material", selection: $material) {
-                    ForEach(PipeMaterial.allCases) { Text($0.label).tag($0) }
-                }
-                HStack {
-                    Text("Longest run")
-                    Spacer()
-                    TextField("Length", value: $length, format: .number)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                        .frame(maxWidth: 90)
-                        .focused($editing)
-                    Picker("", selection: $lengthUnit) {
-                        ForEach(LengthUnit.allCases) { Text($0.label).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 90)
-                }
-            } header: {
-                Text("Piping")
-            } footer: {
-                Text("Longest-length method: use the distance from the meter or regulator outlet to the farthest appliance for every section of the system.")
-            }
-
             LoadSection(loads: $loads, unit: $loadUnit, focus: $editing)
-
             resultSection
             capacitySection
-
-            Section {
-                Text("Capacities come from the general gas flow equations the code sizing tables are built on (IFGC 402.4 equations 4-1 and 4-2 / NFPA 54), using actual inside diameters. In Ontario, CSA B149.1 governs. Confirm the size against its pipe and tubing capacity tables and the appliance's minimum inlet pressure. Results usually fall within a few percent of the tables.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
+            methodSection
         }
         .navigationTitle("Pipe Sizing")
         .navigationBarTitleDisplayMode(.inline)
         .modifier(KeyboardDoneToolbar(focus: $editing))
+        .onChange(of: units) { _, newUnits in
+            loadUnit = newUnits == .metric ? .kw : .btu
+        }
     }
 
     // MARK: Inputs
+
+    private var systemSection: some View {
+        Section {
+            Picker("Gas", selection: $gas) {
+                ForEach(FuelGas.allCases) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: gas) { _, newGas in
+                systemID = GasSystem.presets(for: newGas)[0].id
+                customInlet = newGas == .natural ? 7 : 11
+            }
+            Picker("Units", selection: $units) {
+                ForEach(UnitSystem.allCases) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.segmented)
+
+            Picker("Pressure", selection: $systemID) {
+                ForEach(GasSystem.presets(for: gas)) { preset in
+                    Text(preset.title(units)).tag(preset.id)
+                }
+                Text("Custom…").tag("custom")
+            }
+            if systemID == "custom" {
+                pressureField("Supply pressure", value: $customInlet, unit: $customInletUnit)
+                pressureField("Allowed drop", value: $customDrop, unit: $customDropUnit)
+                Toggle("Include fittings allowance (F = 1.2)", isOn: $customFittings)
+            }
+        } header: {
+            Text("System")
+        } footer: {
+            if let system {
+                Text(systemFooter(system))
+            }
+        }
+    }
+
+    private var pipingSection: some View {
+        Section {
+            Picker("Material", selection: $material) {
+                ForEach(PipeMaterial.allCases) { Text($0.label).tag($0) }
+            }
+            HStack {
+                Text("Longest run")
+                Spacer()
+                TextField("Length", value: $length, format: .number)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: 90)
+                    .focused($editing)
+                Text(units.lengthUnit)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Piping")
+        } footer: {
+            Text("Measure from the point of delivery (meter or regulator) to the most remote outlet, and use that one length for every section (A.3.4–A.3.5).\(material == .copperL ? " B149.1's tubing tables are for Type K; Type L is calculated the same way with its larger bore." : "")")
+        }
+    }
+
+    private var fittingsSection: some View {
+        Section {
+            Stepper("90° elbows: \(fittings.elbows90)", value: $fittings.elbows90, in: 0...99)
+            Stepper("45° elbows: \(fittings.elbows45)", value: $fittings.elbows45, in: 0...99)
+            Stepper("Tees (through the branch): \(fittings.tees)", value: $fittings.tees, in: 0...99)
+            Stepper("Plug valves / gas cocks: \(fittings.plugValves)", value: $fittings.plugValves, in: 0...99)
+            HStack {
+                Text("Other equivalent length")
+                Spacer()
+                TextField("0", value: $extraLength, format: .number)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: 80)
+                    .focused($editing)
+                Text(units.lengthUnit)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Fittings")
+        } footer: {
+            Text("This table has no fittings allowance (F = 1), so fittings are added as equivalent lengths of pipe (Table A.16: elbow 30 × the inside diameter, 45° 14×, tee 60×, plug valve 30×; copper or brass valves 45% longer).")
+        }
+    }
 
     private func pressureField(_ title: String, value: Binding<Double?>, unit: Binding<PressureUnit>) -> some View {
         HStack {
@@ -99,30 +134,57 @@ struct PipeSizingView: View {
             Picker("", selection: unit) {
                 ForEach(PressureUnit.allCases) { Text($0.label).tag($0) }
             }
-            .pickerStyle(.segmented)
-            .frame(width: 130)
+            .pickerStyle(.menu)
         }
     }
+
+    // MARK: Values
 
     private var system: GasSystem? {
         if systemID == "custom" {
             guard let customInlet, let customDrop, customInlet > 0, customDrop > 0 else { return nil }
-            return GasSystem.custom(gas: gas, inlet: customInlet, inletUnit: customInletUnit, drop: customDrop, dropUnit: customDropUnit)
+            return GasSystem.custom(gas: gas, inlet: customInlet, inletUnit: customInletUnit, drop: customDrop,
+                                    dropUnit: customDropUnit, includeFittings: customFittings)
         }
         return GasSystem.presets.first { $0.id == systemID }
     }
 
-    private var lengthFeet: Double {
-        lengthUnit.toFeet(length ?? 0)
-    }
+    private var runLength: Double { length ?? 0 }
 
-    private var loadBTU: Double {
-        LoadSection.total(loads, unit: loadUnit)
+    /// Load in the tables' unit: MBH (imperial) or kW (metric).
+    private var load: Double {
+        let btu = LoadSection.total(loads, unit: loadUnit)
+        return units == .imperial ? btu / 1000 : btu / PipeSizing.btuPerKW
     }
 
     private var capacities: [PipeCapacity] {
-        guard let system, lengthFeet > 0 else { return [] }
-        return PipeSizing.capacities(material: material, lengthFeet: lengthFeet, system: system)
+        guard let system, runLength > 0 else { return [] }
+        return PipeSizing.capacities(
+            material: material, length: runLength, units: units, system: system,
+            fittings: system.includesFittings ? FittingCounts() : fittings,
+            extraLength: system.includesFittings ? 0 : (extraLength ?? 0)
+        )
+    }
+
+    private func capacityText(_ value: Int) -> String {
+        "\(value.formatted()) \(units.capacityUnit)"
+    }
+
+    private func lengthText(_ value: Double) -> String {
+        "\(Format.number(value, digits: 1)) \(units.lengthUnit)"
+    }
+
+    private func systemFooter(_ system: GasSystem) -> String {
+        var parts: [String] = [system.note + "."]
+        if let table = system.table(for: material, units: units) {
+            parts.append("Same as CSA B149.1 \(table).")
+        } else if system.gas == .propane {
+            parts.append("Propane uses the same B149.1 formulas with propane's properties (Cr 1.2462, 2,516 Btu/ft³). Its Annex B tables haven't been checked yet.")
+        }
+        parts.append(system.includesFittings
+            ? "Includes an allowance for a reasonable number of fittings (pipe length × 1.2)."
+            : "No fittings allowance: add the fittings below.")
+        return parts.joined(separator: " ")
     }
 
     // MARK: Results
@@ -130,30 +192,26 @@ struct PipeSizingView: View {
     @ViewBuilder
     private var resultSection: some View {
         Section("Result") {
-            if let system, lengthFeet > 0, loadBTU > 0 {
-                if let pick = PipeSizing.recommended(capacities, loadBTU: loadBTU) {
+            if let system, runLength > 0, load > 0 {
+                if let pick = PipeSizing.recommended(capacities, load: load) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(pick.size)
                             .font(.largeTitle.weight(.bold))
-                        Text("\(material.label) for \(Format.btu(loadBTU)) over \(Format.length(feet: lengthFeet, unit: lengthUnit)).")
+                        Text("\(material.label) for \(Format.btu(LoadSection.total(loads, unit: loadUnit))).")
                             .font(.callout)
-                        Text("Carries up to \(Format.mbh(pick.btuPerHour)) (\(Format.number(pick.cfh)) ft³/h) at \(system.dropUnit.format(system.drop)) drop.")
+                        Text(rowExplanation(pick, system: system))
                             .font(.callout)
                             .foregroundStyle(.secondary)
-                        if let drop = PipeSizing.actualDrop(insideDiameter: pick.insideDiameter, lengthFeet: lengthFeet, loadBTU: loadBTU, system: system) {
-                            Text("Pressure drop at this load: about \(system.dropUnit.format(drop)).")
+                        if let drop = PipeSizing.actualDrop(insideDiameterInches: pick.insideDiameter, length: pick.effectiveLength,
+                                                            load: load, units: units, system: system) {
+                            Text("Pressure drop at this load over \(lengthText(pick.effectiveLength)): about \(dropText(drop, system: system)).")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
-                        }
-                        if loadBTU > pick.btuPerHour * 0.95 {
-                            Label("Within 5% of this size's capacity. Check the B149.1 table, or go up a size.", systemImage: "exclamationmark.triangle")
-                                .font(.callout)
-                                .foregroundStyle(.orange)
                         }
                     }
                     .padding(.vertical, 4)
                 } else {
-                    Label("Larger than every size listed. Raise the pressure, shorten the run or split the load.", systemImage: "xmark.octagon")
+                    Label("Larger than every size listed. Use a higher pressure system or split the load.", systemImage: "xmark.octagon")
                         .foregroundStyle(.red)
                 }
             } else {
@@ -163,36 +221,66 @@ struct PipeSizingView: View {
         }
     }
 
+    private func rowExplanation(_ pick: PipeCapacity, system: GasSystem) -> String {
+        let table = system.table(for: material, units: units).map { "\($0), " } ?? ""
+        if pick.beyondTable {
+            return "\(table)beyond the longest length the tables list, so calculated at \(lengthText(pick.effectiveLength)): carries \(capacityText(pick.capacity))."
+        }
+        let fittingsNote = pick.effectiveLength > runLength + 0.05 ? " (\(lengthText(pick.effectiveLength)) with fittings)" : ""
+        return "\(table)\(Format.number(pick.rowLength)) \(units.lengthUnit) row\(fittingsNote): carries \(capacityText(pick.capacity)) against a load of \(Format.number(load, digits: 1)) \(units.capacityUnit)."
+    }
+
+    private func dropText(_ value: Double, system: GasSystem) -> String {
+        switch units {
+        case .imperial:
+            return system.dropUnit.format(value)
+        case .metric:
+            return value < 1 ? "\(Int((value * 1000).rounded())) Pa" : PressureUnit.kPa.format(value)
+        }
+    }
+
     @ViewBuilder
     private var capacitySection: some View {
         if let system, !capacities.isEmpty {
-            let pick = PipeSizing.recommended(capacities, loadBTU: loadBTU)
+            let pick = PipeSizing.recommended(capacities, load: load)
+            let rowsDiffer = Set(capacities.map(\.rowLength)).count > 1
             Section {
                 ForEach(capacities) { item in
                     HStack {
                         Text(item.size)
                             .fontWeight(item.id == pick?.id ? .bold : .regular)
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 1) {
-                            Text(Format.mbh(item.btuPerHour))
-                                .monospacedDigit()
-                            Text("\(Format.number(item.cfh)) ft³/h")
+                        if rowsDiffer {
+                            Text("\(Format.number(item.rowLength)) \(units.lengthUnit)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                                .monospacedDigit()
                         }
+                        Spacer()
+                        Text(capacityText(item.capacity))
+                            .monospacedDigit()
                         if item.id == pick?.id {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
                         }
                     }
-                    .foregroundStyle(loadBTU > 0 && item.btuPerHour < loadBTU ? Color.secondary : Color.primary)
+                    .foregroundStyle(load > 0 && Double(item.capacity) < load ? Color.secondary : Color.primary)
                 }
             } header: {
-                Text("Capacity at \(Format.length(feet: lengthFeet, unit: lengthUnit))")
+                if rowsDiffer {
+                    Text("Capacity (length row per size, with fittings)")
+                } else {
+                    Text("Capacity at the \(Format.number(capacities[0].rowLength)) \(units.lengthUnit) row")
+                }
             } footer: {
-                Text("\(gas.label), \(system.title). MBH = thousands of BTU/h.")
+                Text("\(gas.label), \(system.title(units)). \(units == .imperial ? "MBH = thousands of Btu/h" : "kW").")
             }
+        }
+    }
+
+    private var methodSection: some View {
+        Section {
+            Text("Calculated with the formulas in CSA B149.1-20 clause A.3.5, which generate capacity Tables A.1 to A.14. It uses Schedule 40 and Type K copper inside diameters, 1,000 Btu/ft³ natural gas at relative density 0.6, and the tables' 20% fittings allowance where they include one. Like the tables, it reads the next larger length (A.3.5) and picks the first size whose capacity covers the load (A.3.7). Results match the printed tables to within rounding.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 }

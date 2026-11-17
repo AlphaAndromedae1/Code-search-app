@@ -39,12 +39,18 @@ Your library stays on your device. The app goes online only to check the TSSA, C
 - Bookmarks with notes.
 
 **Tools** (Tools tab)
-- **Pipe Sizing:** steel (Schedule 40) or copper tubing (Type L or K) for natural gas or propane. It uses the longest-length method, with the run in feet or metres and loads in BTU/h or kW for each appliance. Pressure presets:
-  - **Natural gas:** 7" w.c. (0.5" or 1" drop), 2 psi (1 psi drop), 5 psi (3.5 psi drop), 10 psi (1 psi drop).
-  - **Propane:** 11" w.c. (0.5" or 1" drop), 2 psi (1 psi drop), **10 psi first stage to second stage** (1 psi drop).
-  - **Custom:** any pressure and drop.
-  - **Results:** the smallest size that carries the load, the pressure drop at that load, and every size's capacity at that length.
-  - **Method:** the code's gas flow equations (IFGC 402.4 equations 4-1/4-2, NFPA 54) with actual inside diameters, within a few percent of the tables. Confirm against the CSA B149.1 tables.
+- **Pipe Sizing:** follows CSA B149.1-20 Annex A, using the formulas in clause A.3.5 that generate capacity Tables A.1–A.14.
+  - **Pressures:** each natural gas table's pressure and drop:
+    - under 7" w.c. (0.5" drop) and 7–14" w.c. (1" drop)
+    - 2 psi (1 or 1.5 psi drop)
+    - 5 psi (2.5 psi drop), 10 psi (5 psi drop) and 20 psi (10 psi drop)
+    - a custom pressure and drop
+  - **Pipe:** Schedule 40 steel or Type K copper, the tables' inside diameters. Type L copper is calculated the same way.
+  - **Units:** imperial (ft, MBH) or metric (m, kW).
+  - **Fittings:** the 20% allowance where the tables include it. For the 5, 10 and 20 psi tables, you enter fittings and they're added as Table A.16 equivalent lengths.
+  - **Reading the table:** like the tables, it uses the next larger length (A.3.5) and the first size that covers the load (A.3.7).
+  - **Checked against the printed tables:** within ±1 on 97% of the 4,926 values; the rest differ by under 0.15%.
+  - **Propane:** uses the same formulas with propane's properties, but hasn't been checked against B149.1's Annex B tables yet.
 - **CSST Sizing:** Gastite/FlashShield's own capacity tables (natural gas in ft³/h, propane in MBH):
   - **Natural gas:** 7" w.c. with a 0.5–6" drop, plus 1, 2, 5 and 10 psi.
   - **Propane:** 11" w.c. with a 0.5–3" drop, plus 2, 5 and 10 psi.
@@ -195,7 +201,7 @@ CodeShelf/
     WebPageCapture.swift    Saves a browsed page as a searchable PDF
     UpdatesStore.swift      Followed bulletin sources, new-item detection, rule-number matching
     Ontario.swift           e-Laws regulations and municipal by-law search links
-    PipeSizing.swift        Steel/copper gas pipe capacity (IFGC 402.4 equations 4-1 and 4-2)
+    PipeSizing.swift        Steel/copper gas pipe capacity (CSA B149.1 Annex A, clause A.3.5 formulas)
     CSSTSizing.swift        CSST lookup in Resources/CSSTSizing.json (Gastite/FlashShield tables)
     FuelPrices.swift        Ontario fuel price survey, NRCan + Statistics Canada furnace oil, cached for offline use
     PDFTextScan.swift       Reads PDFs directly when the index can't find a clause number
