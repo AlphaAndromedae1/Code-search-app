@@ -57,7 +57,8 @@ print("\n== Update sources and e-Laws pages (must load)")
 sources = set()
 for path in ["CodeShelf/Services/UpdatesStore.swift", "CodeShelf/Services/Ontario.swift", "CodeShelf/Services/FuelPrices.swift"]:
     for url in re.findall(r'"(https://[^"\\]+)"', (ROOT / path).read_text()):
-        if "google." not in url:
+        # Search engines aren't checked; the StatCan web service only answers POSTs (checked below).
+        if "google." not in url and "/wds/rest/" not in url:
             sources.add(url)
 for url in sorted(sources):
     status, kind, _ = fetch(url, limit=512)
@@ -83,6 +84,21 @@ for city, location in [("Kingston", 72), ("Thunder Bay", 23), ("Windsor", 19)]:
     print(f"  {'OK ' if ok else 'BAD'}  furnace oil {city}: HTTP {status} latest {price.groups() if price else 'none listed'}")
     if not ok:
         problems.append(f"NRCan furnace oil feed for {city} -> HTTP {status}")
+
+statcan = "https://www150.statcan.gc.ca/t1/wds/rest/getDataFromCubePidCoordAndLatestNPeriods"
+body = json.dumps([{"productId": 18100001, "coordinate": f"{geo}.7.0.0.0.0.0.0.0.0", "latestN": 1} for geo in (9, 8, 10)]).encode()
+request = urllib.request.Request(statcan, data=body, headers={**HEADERS, "Content-Type": "application/json", "Accept": "application/json"})
+try:
+    with urllib.request.urlopen(request, timeout=60) as response:
+        reply = json.loads(response.read())
+    values = [(r["object"]["vectorDataPoint"][-1]["refPer"], r["object"]["vectorDataPoint"][-1]["value"]) for r in reply if r.get("status") == "SUCCESS"]
+    ok = len(values) == 3
+    print(f"  {'OK ' if ok else 'BAD'}  heating fuel, Statistics Canada (Toronto, Ottawa, Thunder Bay): {values}")
+except Exception as error:  # HTTP errors, JSON changes
+    ok = False
+    print(f"  BAD  heating fuel, Statistics Canada: {error}")
+if not ok:
+    problems.append("Statistics Canada heating fuel prices (table 18-10-0001-01) didn't return Toronto, Ottawa and Thunder Bay")
 
 if problems:
     print(f"\n{len(problems)} link problem(s):")
