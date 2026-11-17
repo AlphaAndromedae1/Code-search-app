@@ -294,3 +294,87 @@ struct LinkedRefsSheet: View {
         .presentationDetents([.medium, .large])
     }
 }
+
+/// Shows the text CodeShelf stored for a page: exactly what Search can match there.
+/// If a clause number or words are missing or scrambled here, Search can't find them.
+struct PageTextSheet: View {
+    @Environment(LibraryStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    let bookID: UUID
+    let pageIndex: Int
+    @State private var text: String?
+    @State private var loaded = false
+    @State private var confirmOCR = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    if !loaded {
+                        ProgressView()
+                    } else if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text(text)
+                            .font(.system(.footnote, design: .monospaced))
+                            .textSelection(.enabled)
+                    } else {
+                        Text(emptyMessage)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text(store.pageDescription(bookID: bookID, pageIndex: pageIndex))
+                } footer: {
+                    Text("This is what Search reads on this page. If a clause number like 4.7.4 is missing, joined to other words, or the text looks scrambled, re-read the book with OCR so the printed page is read instead.")
+                }
+
+                if let book = store.book(id: bookID) {
+                    Section {
+                        LabeledContent("Pages", value: "\(book.pageCount)")
+                        LabeledContent("Indexed", value: "\(book.indexedPages)")
+                        if book.textPages >= 0 {
+                            LabeledContent("Pages with text", value: "\(book.textPages)")
+                        }
+                        LabeledContent("Read with OCR", value: book.forceOCR ? "Every page" : "\(book.ocrPages) pages")
+                        if book.forceOCR {
+                            Button("Use the PDF's Own Text Again") {
+                                store.rereadWithOCR(bookID: bookID, enabled: false)
+                                dismiss()
+                            }
+                        } else {
+                            Button("Re-read This Book with OCR") { confirmOCR = true }
+                        }
+                    } header: {
+                        Text("Search index for this book")
+                    }
+                }
+            }
+            .navigationTitle("Searchable Text")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .confirmationDialog("Re-read with OCR?", isPresented: $confirmOCR, titleVisibility: .visible) {
+                Button("Re-read Every Page") {
+                    store.rereadWithOCR(bookID: bookID)
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("CodeShelf will read every printed page with text recognition instead of the PDF's own text. A large code book takes several minutes; keep the app open while it runs.")
+            }
+            .task {
+                text = await store.index.pageText(bookID: bookID, page: pageIndex)
+                loaded = true
+            }
+        }
+    }
+
+    private var emptyMessage: String {
+        guard let book = store.book(id: bookID) else { return "No text stored for this page." }
+        if pageIndex >= book.indexedPages {
+            return "This page hasn't been indexed yet (\(book.indexedPages) of \(book.pageCount) pages done). Keep CodeShelf open so indexing can finish."
+        }
+        return "No text could be read on this page. If it's a scanned page, turn on Settings › Read Scanned Pages (OCR) or re-read the book with OCR."
+    }
+}

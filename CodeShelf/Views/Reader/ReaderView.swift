@@ -17,6 +17,7 @@ struct ReaderView: View {
         case linked
         case bulletins
         case web(URL)
+        case pageText
 
         var id: String {
             switch self {
@@ -28,6 +29,7 @@ struct ReaderView: View {
             case .linked: return "linked"
             case .bulletins: return "bulletins"
             case .web: return "web"
+            case .pageText: return "pageText"
             }
         }
     }
@@ -166,6 +168,11 @@ struct ReaderView: View {
                 } label: {
                     Label("Open in Compare", systemImage: "rectangle.split.2x1")
                 }
+                Button {
+                    sheet = .pageText
+                } label: {
+                    Label("Show Searchable Text", systemImage: "doc.text.magnifyingglass")
+                }
                 if let source = sourceURL {
                     Divider()
                     Button {
@@ -254,6 +261,8 @@ struct ReaderView: View {
             BulletinMatchesSheet(matches: bulletinMatches) { picked in
                 pendingRoute = picked
             }
+        case .pageText:
+            PageTextSheet(bookID: route.bookID, pageIndex: currentPage)
         case .web(let url):
             NavigationStack {
                 WebCodeBrowser(route: BrowserRoute(

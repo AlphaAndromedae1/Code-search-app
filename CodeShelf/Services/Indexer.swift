@@ -19,6 +19,7 @@ enum Indexer {
         startPage: Int,
         startOCRCount: Int,
         ocrEnabled: Bool,
+        forceOCR: Bool = false,
         index: SearchIndex,
         progress: @escaping @Sendable (Int, Int) async -> Void
     ) async -> Outcome {
@@ -41,7 +42,7 @@ enum Indexer {
             if page > first && (page - first) % 150 == 0, let fresh = openDocument(url) {
                 document = fresh
             }
-            let extracted = extractText(document: document, pageIndex: page, ocrEnabled: ocrEnabled)
+            let extracted = extractText(document: document, pageIndex: page, ocrEnabled: ocrEnabled, forceOCR: forceOCR)
             if extracted.usedOCR { ocrCount += 1 }
             batch.append(PageText(page: page, text: extracted.text))
             page += 1
@@ -66,10 +67,18 @@ enum Indexer {
         return document
     }
 
-    private static func extractText(document: PDFDocument, pageIndex: Int, ocrEnabled: Bool) -> (text: String, usedOCR: Bool) {
+    private static func extractText(document: PDFDocument, pageIndex: Int, ocrEnabled: Bool, forceOCR: Bool) -> (text: String, usedOCR: Bool) {
         autoreleasepool { () -> (text: String, usedOCR: Bool) in
             guard let page = document.page(at: pageIndex) else { return (text: "", usedOCR: false) }
             let text = page.string ?? ""
+
+            // The PDF's own text is scrambled (fonts without a proper character map): read the printed page instead.
+            if forceOCR {
+                if let recognized = recognizeText(on: page), recognized.unicodeScalars.contains(where: { CharacterSet.alphanumerics.contains($0) }) {
+                    return (text: recognized, usedOCR: true)
+                }
+                return (text: text, usedOCR: false)
+            }
 
             var meaningful = 0
             for scalar in text.unicodeScalars where CharacterSet.alphanumerics.contains(scalar) {

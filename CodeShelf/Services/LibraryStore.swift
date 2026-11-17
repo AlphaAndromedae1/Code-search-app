@@ -742,6 +742,13 @@ final class LibraryStore {
         enqueueIndexing(bookID)
     }
 
+    /// Re-reads every page of a book with OCR instead of the PDF's own (scrambled) text.
+    func rereadWithOCR(bookID: UUID, enabled: Bool = true) {
+        guard let i = books.firstIndex(where: { $0.id == bookID }) else { return }
+        books[i].forceOCR = enabled
+        reindex(bookID: bookID)
+    }
+
     func reindexAll() {
         for book in books {
             reindex(bookID: book.id)
@@ -769,6 +776,7 @@ final class LibraryStore {
         let start = book.indexedPages
         let startOCR = book.ocrPages
         let ocr = AppSettings.ocrEnabled
+        let forceOCR = book.forceOCR
         let index = self.index
 
         let report: @Sendable (Int, Int) async -> Void = { [weak self] done, ocrPages in
@@ -782,6 +790,7 @@ final class LibraryStore {
                 startPage: start,
                 startOCRCount: startOCR,
                 ocrEnabled: ocr,
+                forceOCR: forceOCR,
                 index: index,
                 progress: report
             )

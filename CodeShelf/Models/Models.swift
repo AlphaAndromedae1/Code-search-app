@@ -112,6 +112,8 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
     var inDocuments: Bool = false
     /// Pages with searchable text after indexing; -1 until known. 0 means nothing can be found in it.
     var textPages: Int = -1
+    /// Read every page with OCR, ignoring the PDF's own text layer (for PDFs whose text comes out scrambled).
+    var forceOCR: Bool = false
 
     init(title: String, fileName: String) {
         self.title = title
@@ -135,7 +137,7 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id, title, shortName, category, jurisdiction, edition, fileName, fileSize
         case pageCount, indexedPages, ocrPages, dateAdded, lastPage, notes, sourceURL
-        case modelNumbers, equipmentType, sourceVersion, inDocuments, textPages
+        case modelNumbers, equipmentType, sourceVersion, inDocuments, textPages, forceOCR
     }
 
     // Tolerant decoding so future versions can add fields without wiping the library.
@@ -161,6 +163,7 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
         inDocuments = try c.decodeIfPresent(Bool.self, forKey: .inDocuments) ?? false
         sourceURL = try c.decodeIfPresent(String.self, forKey: .sourceURL) ?? ""
         textPages = try c.decodeIfPresent(Int.self, forKey: .textPages) ?? -1
+        forceOCR = try c.decodeIfPresent(Bool.self, forKey: .forceOCR) ?? false
     }
 
     /// Indexed, but no page had text to search (a scan that OCR couldn't read, or a locked file).

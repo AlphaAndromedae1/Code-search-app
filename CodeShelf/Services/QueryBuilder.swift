@@ -6,6 +6,11 @@ struct SearchQuery: Equatable {
     let expression: String
     /// Plain strings to highlight on the PDF page.
     let highlightTerms: [String]
+    /// For clause / rule numbers: the same query with the number's last part as a prefix, so
+    /// "4.7.4" also finds text where the PDF runs it into the next word ("4.7.4Appliances").
+    var lenientExpression: String? = nil
+    /// Clause / rule numbers typed (e.g. "4.7.4"), as typed.
+    var sectionNumbers: [String] = []
 }
 
 /// Turns what the user typed into a safe full-text query.
@@ -39,6 +44,8 @@ enum QueryBuilder {
         flush(quoted: inQuotes)
 
         var expression = ""
+        var lenient = ""
+        var sections: [String] = []
         var highlights: [String] = []
         var pendingOr = false
         for term in terms {
@@ -50,24 +57,40 @@ enum QueryBuilder {
             let tokens = tokenize(term.text)
             guard !tokens.isEmpty else { continue }
             let part: String
+            var lenientPart: String
             if tokens.count == 1 && !term.quoted {
                 let token = tokens[0]
                 let isNumber = token.allSatisfy { $0.isNumber }
                 part = (isNumber || token.count < 3) ? "\"\(token)\"" : "\(token)*"
+                lenientPart = part
             } else {
                 part = "\"" + tokens.joined(separator: " ") + "\""
+                lenientPart = part
+                // A clause or rule number like 4.7.4 or 26-700.
+                if !term.quoted && tokens.count >= 2 && tokens.allSatisfy({ $0.allSatisfy(\.isNumber) }) {
+                    lenientPart = part + " *"
+                    sections.append(term.text.trimmingCharacters(in: CharacterSet.punctuationCharacters.union(.symbols)))
+                }
             }
             if !expression.isEmpty {
-                expression += (pendingOr || !matchAll) ? " OR " : " "
+                let joiner = (pendingOr || !matchAll) ? " OR " : " "
+                expression += joiner
+                lenient += joiner
             }
             expression += part
+            lenient += lenientPart
             pendingOr = false
 
             let display = term.text.trimmingCharacters(in: CharacterSet.punctuationCharacters.union(.symbols))
             if !display.isEmpty { highlights.append(display) }
         }
         guard !expression.isEmpty else { return nil }
-        return SearchQuery(expression: expression, highlightTerms: highlights)
+        return SearchQuery(
+            expression: expression,
+            highlightTerms: highlights,
+            lenientExpression: sections.isEmpty ? nil : lenient,
+            sectionNumbers: sections
+        )
     }
 
     /// Splits on anything that isn't a letter or digit, matching SQLite's unicode61 tokenizer.

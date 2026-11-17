@@ -24,6 +24,8 @@ if probe is None:
 
 print(f"Survey markets: {probe['markets']}  error: {probe['error'] or 'none'}")
 print(f"Furnace oil cities: {', '.join(probe['furnaceOilCities']) or 'none'}")
+print(f"Heating fuel, monthly (Statistics Canada): {', '.join(probe.get('heatingMonthly', [])) or 'none'}")
+print(f"Furnace oil problems: {probe.get('furnaceProblem') or 'none'}")
 ok = True
 for row in probe["rows"]:
     cents = row["cents"]

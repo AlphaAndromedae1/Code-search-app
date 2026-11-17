@@ -20,6 +20,11 @@ Your library stays on your device. The app goes online only to check the TSSA, C
 - One search box across every book. **Code books always come first**, then bulletins, then manufacturer instructions, each grouped by book with the best matches first. A long manual can't push your code book off the list. Snippets highlight what matched.
 - Code books are indexed before manuals and bulletins. If one is still being indexed, Search names it and shows how far along it is. A PDF with no readable text (a scan without OCR) is flagged so you know why nothing in it turns up.
 - Rule, article and clause numbers match exactly: `26-700` finds Rule 26-700, `9.10.14.5` finds that article (not 9.10.14.50), and `6.18.2` finds that B149 clause.
+- **If a clause number isn't found exactly**, CodeShelf keeps looking:
+  - **Run-on text:** it accepts the number run into the next word or number, as some PDFs print it (`4.7.4Appliances`).
+  - **Direct read:** it reads the code book PDFs directly, which also catches `Clause4.7.4` and pages not indexed yet.
+  - **Still nothing:** it shows each code book's status (still indexing, pages with readable text) and what to do next.
+- **Reader › ••• › Show Searchable Text** shows exactly what Search can read on a page. If a PDF's text comes out scrambled, **Re-read with OCR** (there, or by long-pressing the book in Library) reads the printed pages instead.
 - `smoke alarm` finds pages with both words, including word starts like *alarms*.
 - `"means of egress"` matches an exact phrase.
 - `egress OR exit` matches either word. You can also switch to "match any word" in the filter menu.
@@ -47,7 +52,7 @@ Your library stays on your device. The app goes online only to check the TSSA, C
   - **Other brands:** TracPipe and WARDFlex have different EHDs, so use their tables in the Fuel Equipment Library.
 - **Fuel Prices (CAD):** this week's propane, furnace oil, regular and premium gasoline, diesel and dyed diesel, in cents per litre with the change from last week. Pick the Ontario average or your area.
   - **Gasoline, diesel and auto propane:** the Ontario Ministry of Energy's weekly survey of 14 markets.
-  - **Furnace oil:** Natural Resources Canada's weekly prices for the Ontario cities it surveys.
+  - **Furnace oil:** Natural Resources Canada's weekly prices for the Ontario cities it surveys. Statistics Canada's monthly household heating fuel prices fill in for Toronto, Ottawa and Thunder Bay, and back up NRCan if it's unreachable.
   - **Dyed diesel:** an estimate, since no public survey reports it. It's clear diesel minus Ontario's 9.0¢/L diesel tax and the HST on it (10.2¢/L, adjustable).
 - **Compare** (below) is in Tools too.
 
@@ -192,6 +197,7 @@ CodeShelf/
     Ontario.swift           e-Laws regulations and municipal by-law search links
     PipeSizing.swift        Steel/copper gas pipe capacity (IFGC 402.4 equations 4-1 and 4-2)
     CSSTSizing.swift        CSST lookup in Resources/CSSTSizing.json (Gastite/FlashShield tables)
-    FuelPrices.swift        Ontario fuel price survey + NRCan furnace oil, cached for offline use
+    FuelPrices.swift        Ontario fuel price survey, NRCan + Statistics Canada furnace oil, cached for offline use
+    PDFTextScan.swift       Reads PDFs directly when the index can't find a clause number
   Views/                    Library, Search, Reader, Tools (calculators, fuel prices, Compare), Saved, Updates, Web browser
 ```

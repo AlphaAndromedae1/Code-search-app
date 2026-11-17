@@ -9,7 +9,7 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
 endobj
 4 0 obj
-<< /Length 337 >>
+<< /Length 466 >>
 stream
 BT
 /F1 12 Tf
@@ -20,6 +20,8 @@ BT
 (\(1\) Each supply tank shall be provided with a vent pipe that terminates outdoors) Tj T*
 (at a location where vapours will not enter the building.) Tj T*
 (7.3.2 Fill pipes shall terminate outdoors with a cap approved for the purpose.) Tj T*
+(7.3.3Tank supports shall be steel or concrete.) Tj T*
+(Piping from the tank shall be sized per Clause7.4.2 of this Code.) Tj T*
 ET
 endstream
 endobj
@@ -33,9 +35,9 @@ xref
 0000000058 00000 n 
 0000000115 00000 n 
 0000000241 00000 n 
-0000000629 00000 n 
+0000000758 00000 n 
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-726
+855
 %%EOF

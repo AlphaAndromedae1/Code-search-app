@@ -99,26 +99,44 @@ struct FuelPricesView: View {
 
     @ViewBuilder
     private var furnaceOilSection: some View {
-        let readings = prices.currentFurnaceOil
-        if !readings.isEmpty {
+        let weekly = prices.currentFurnaceOil
+        let monthly = prices.snapshot?.heatingMonthly ?? []
+        if !weekly.isEmpty || !monthly.isEmpty {
             Section {
-                ForEach(readings) { reading in
-                    HStack {
-                        Text(reading.city)
-                        Spacer()
-                        Text("\(reading.centsPerLitre.formatted(.number.precision(.fractionLength(1))))¢")
-                            .monospacedDigit()
-                        Text(reading.date.formatted(.dateTime.month(.abbreviated).day()))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 50, alignment: .trailing)
-                    }
+                ForEach(weekly) { reading in
+                    cityRow(reading.city, cents: reading.centsPerLitre, date: reading.date.formatted(.dateTime.month(.abbreviated).day()))
+                }
+                ForEach(monthly) { reading in
+                    cityRow(reading.city, cents: reading.centsPerLitre, date: reading.date.formatted(.dateTime.month(.abbreviated).year()))
                 }
             } header: {
                 Text("Furnace oil by city")
             } footer: {
-                Text("Natural Resources Canada surveys furnace oil weekly in these Ontario cities.")
+                VStack(alignment: .leading, spacing: 4) {
+                    if !weekly.isEmpty {
+                        Text("Weekly prices from Natural Resources Canada.")
+                    }
+                    if !monthly.isEmpty {
+                        Text("Monthly prices (with month) from Statistics Canada for \(monthly.map(\.city).joined(separator: ", ")).")
+                    }
+                    if let problem = prices.snapshot?.furnaceProblem {
+                        Text("Not loaded: \(problem)")
+                    }
+                }
             }
+        }
+    }
+
+    private func cityRow(_ city: String, cents: Double, date: String) -> some View {
+        HStack {
+            Text(city)
+            Spacer()
+            Text("\(cents.formatted(.number.precision(.fractionLength(1))))¢")
+                .monospacedDigit()
+            Text(date)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 70, alignment: .trailing)
         }
     }
 
@@ -128,7 +146,10 @@ struct FuelPricesView: View {
                 Label("Ontario motor fuel prices (gasoline, diesel, auto propane)", systemImage: "link")
             }
             Link(destination: FuelPriceSources.nrcanPage) {
-                Label("Natural Resources Canada retail prices (furnace oil)", systemImage: "link")
+                Label("Natural Resources Canada retail prices (furnace oil, weekly)", systemImage: "link")
+            }
+            Link(destination: FuelPriceSources.statCanPage) {
+                Label("Statistics Canada heating fuel prices (monthly)", systemImage: "link")
             }
         }
         .font(.callout)

@@ -59,10 +59,13 @@ struct CodeShelfApp: App {
                 "error": prices.errorMessage ?? "",
                 "markets": prices.snapshot?.markets.count ?? 0,
                 "furnaceOilCities": prices.currentFurnaceOil.map(\.city),
+                "heatingMonthly": (prices.snapshot?.heatingMonthly ?? []).map { "\($0.city) \($0.centsPerLitre)" },
+                "furnaceProblem": prices.snapshot?.furnaceProblem ?? "",
                 "rows": rows.map { ["name": $0.name, "cents": $0.cents ?? -1, "date": $0.date, "note": $0.note ?? ""] as [String: Any] },
             ])
         }
-        guard let query = defaults.string(forKey: "searchProbe"), !query.isEmpty else { return }
+        guard let probe = defaults.string(forKey: "searchProbe"), !probe.isEmpty else { return }
+        let queries = probe.split(separator: "|").map(String.init)
         var lastSignature = ""
         for _ in 0..<200 {
             try? await Task.sleep(for: .seconds(2))
@@ -70,17 +73,25 @@ struct CodeShelfApp: App {
             let signature = store.books.map { "\($0.id)-\($0.indexedPages)" }.sorted().joined(separator: ",")
             guard signature != lastSignature else { continue }
             lastSignature = signature
-            let model = SearchModel()
-            await model.run(query: query, matchAll: false, bookIDs: nil, store: store)
-            var results: [[String: Any]] = []
-            for tier in model.tiers {
-                for group in tier.groups {
-                    if let book = store.book(id: group.bookID) {
-                        results.append(["title": book.title, "tier": tier.tier.label, "pages": group.hits.count])
+            var answers: [String: Any] = [:]
+            for query in queries {
+                let model = SearchModel()
+                await model.run(query: query, matchAll: false, bookIDs: nil, store: store)
+                var results: [[String: Any]] = []
+                for tier in model.tiers {
+                    for group in tier.groups {
+                        if let book = store.book(id: group.bookID) {
+                            results.append([
+                                "title": book.title, "tier": tier.tier.label, "pages": group.hits.count,
+                                "firstPage": group.hits.first?.pageIndex ?? -1, "note": tier.note ?? "",
+                                "snippet": group.hits.first?.snippet ?? "",
+                            ])
+                        }
                     }
                 }
+                answers[query] = ["results": results, "missedCodeBooks": model.missedCodeBooks]
             }
-            writeProbe("search-probe.json", ["query": query, "bookCount": store.books.count, "results": results])
+            writeProbe("search-probe.json", ["bookCount": store.books.count, "queries": answers])
         }
         #endif
     }

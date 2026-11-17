@@ -83,7 +83,7 @@ plain = db.execute(
 ).fetchall()
 print("  bm25 order alone:", [next((b["title"] for b in books if b["id"] == row[0]), row[0]) for row in plain])
 probe = {}
-deadline = time.time() + 60
+deadline = time.time() + 90
 while time.time() < deadline:
     try:
         probe = json.loads((root / "search-probe.json").read_text())
@@ -92,7 +92,14 @@ while time.time() < deadline:
     except (FileNotFoundError, json.JSONDecodeError):
         pass
     time.sleep(2)
-ranked = [(r["title"], r["tier"]) for r in probe.get("results", [])]
+answers = probe.get("queries", {})
+
+
+def ranked_for(query):
+    return [(r["title"], r["tier"]) for r in answers.get(query, {}).get("results", [])]
+
+
+ranked = ranked_for("venting instructions")
 print("  Search tab order:", ranked)
 titles = [t for t, _ in ranked]
 check(len(ranked) >= 2 and ranked[0] == ("CSA B139-24 Installation code for oil-burning equipment", "Code Books")
@@ -101,6 +108,18 @@ check(len(ranked) >= 2 and ranked[0] == ("CSA B139-24 Installation code for oil-
       "Search lists the code book before the manufacturer manual")
 check(dict(ranked).get("Acme AF100 Furnace Installation Instructions") == "Manufacturer Instructions",
       "manual results are grouped under Manufacturer Instructions")
+
+# Clause numbers the PDF prints joined to other text, like the real code books do.
+B139 = "CSA B139-24 Installation code for oil-burning equipment"
+for query, how in [("7.3.3", "run into the next word (7.3.3Tank)"), ("7.4.2", "joined to the word before (Clause7.4.2)")]:
+    results = answers.get(query, {}).get("results", [])
+    print(f"  {query}:", json.dumps(results, ensure_ascii=False)[:400])
+    check(any(r["title"] == B139 and r["tier"] == "Code Books" and r["firstPage"] == 0 for r in results),
+          f"'{query}' is found in the code book when the PDF prints it {how}")
+missing = answers.get("7.9.9", {})
+print("  7.9.9:", json.dumps(missing)[:300])
+check(missing.get("results") == [] and missing.get("missedCodeBooks") is True,
+      "a clause that isn't in any book says so and explains each code book's status")
 text_pages = {}
 deadline = time.time() + 30
 while time.time() < deadline:

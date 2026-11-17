@@ -51,14 +51,45 @@ struct SearchView: View {
         } else if trimmedQuery.isEmpty {
             idleView
         } else if model.groups.isEmpty {
-            if model.isCurrent(for: query) {
-                ContentUnavailableView.search(text: trimmedQuery)
+            if model.isScanningPDFs {
+                ProgressView("Not in the search index.\nReading your code books directly…")
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if model.isCurrent(for: query) {
+                noResults
             } else {
                 ProgressView("Searching…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         } else {
             SearchResultsList(model: model, mode: .navigate)
+        }
+    }
+
+    /// Nothing anywhere: say whether filters hid results and why the code books didn't match.
+    private var noResults: some View {
+        List {
+            Section {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("No results for “\(trimmedQuery)”", systemImage: "magnifyingglass")
+                        .font(.headline)
+                    if hasFilters {
+                        Text("Filters are on, so only some books were searched.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Button("Search All Books") {
+                            selectedBooks = []
+                            category = nil
+                            codesOnly = false
+                            matchAll = true
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            if model.missedCodeBooks {
+                CodeBookSearchStatus(query: trimmedQuery)
+            }
         }
     }
 

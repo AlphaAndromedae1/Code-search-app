@@ -152,6 +152,18 @@ actor SearchIndex {
         return hits
     }
 
+    /// The text stored for one page: exactly what a search can match on it.
+    func pageText(bookID: UUID, page: Int) -> String? {
+        guard let db else { return nil }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT body FROM pages WHERE book_id = ? AND page = ? LIMIT 1", -1, &stmt, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, bookID.uuidString, -1, sqliteTransient)
+        sqlite3_bind_int64(stmt, 2, Int64(page))
+        guard sqlite3_step(stmt) == SQLITE_ROW, let text = sqlite3_column_text(stmt, 0) else { return nil }
+        return String(cString: text)
+    }
+
     /// Pages of a book that hold enough text to be found by a search.
     func textPageCount(bookID: UUID) -> Int {
         guard let db else { return 0 }

@@ -195,6 +195,11 @@ struct LibraryView: View {
                             } label: {
                                 Label("Rebuild Search Index", systemImage: "arrow.clockwise")
                             }
+                            Button {
+                                store.rereadWithOCR(bookID: book.id, enabled: !book.forceOCR)
+                            } label: {
+                                Label(book.forceOCR ? "Use the PDF's Own Text" : "Re-read with OCR (Scrambled Text)", systemImage: "text.viewfinder")
+                            }
                             Button(role: .destructive) {
                                 pendingDelete = book
                             } label: {
