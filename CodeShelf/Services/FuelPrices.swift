@@ -211,7 +211,9 @@ final class FuelPriceStore {
             id: "furnace", name: "Furnace Oil", detail: "Heating oil, average of \(readings.count) Ontario cities",
             cents: average, change: nil, date: formatter.string(from: latest),
             source: "Natural Resources Canada",
-            note: "NRCan doesn't survey furnace oil in \(marketName); this is the average of \(readings.map(\.city).joined(separator: ", ")).",
+            note: market.contains("Average")
+                ? "Average of the Ontario cities NRCan surveys for furnace oil: \(readings.map(\.city).joined(separator: ", "))."
+                : "NRCan doesn't survey furnace oil in \(marketName); this is the average of \(readings.map(\.city).joined(separator: ", ")).",
             isEstimate: false
         )
     }
