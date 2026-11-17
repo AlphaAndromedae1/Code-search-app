@@ -6,38 +6,68 @@ endobj
 << /Type /Pages /Kids [3 0 R] /Count 1 >>
 endobj
 3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>
 endobj
 4 0 obj
-<< /Length 466 >>
+<< /Length 633 >>
 stream
 BT
-/F1 12 Tf
-16 TL
+/F1 14 Tf
+20 TL
 72 720 Td
-(7.3 Supply tanks) Tj T*
-(7.3.1 Venting of supply tanks) Tj T*
-(\(1\) Each supply tank shall be provided with a vent pipe that terminates outdoors) Tj T*
-(at a location where vapours will not enter the building.) Tj T*
-(7.3.2 Fill pipes shall terminate outdoors with a cap approved for the purpose.) Tj T*
-(7.3.3Tank supports shall be steel or concrete.) Tj T*
-(Piping from the tank shall be sized per Clause7.4.2 of this Code.) Tj T*
+/F1 14 Tf (7.3 Supply tanks) Tj T*
+/F1 14 Tf (7.3.1 Venting of supply tanks) Tj T*
+/F1 14 Tf (\(1\) Each supply tank shall be provided with a vent pipe that terminates outdoors) Tj T*
+/F1 14 Tf (at a location where vapours will not enter the building.) Tj T*
+/F1 14 Tf (7.3.2 Fill pipes shall terminate outdoors with a cap approved for the purpose.) Tj T*
+/F1 14 Tf (7.3.3Tank supports shall be steel or concrete.) Tj T*
+/F1 14 Tf (Piping from the tank shall be sized per Clause7.4.2 of this Code.) Tj T*
+/F2 14 Tf (7.5.1) Tj /F1 14 Tf ( Oil filters shall be installed ahead of the burner pump.) Tj T*
 ET
 endstream
 endobj
 5 0 obj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
 endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding /ToUnicode 7 0 R >>
+endobj
+7 0 obj
+<< /Length 358 >>
+stream
+/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def
+/CMapName /Scrambled def
+/CMapType 2 def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+4 beginbfchar
+<37> <0071>
+<35> <0077>
+<31> <0065>
+<2E> <002E>
+endbfchar
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+endstream
+endobj
 xref
-0 6
+0 8
 0000000000 65535 f 
 0000000009 00000 n 
 0000000058 00000 n 
 0000000115 00000 n 
-0000000241 00000 n 
-0000000758 00000 n 
+0000000251 00000 n 
+0000000935 00000 n 
+0000001032 00000 n 
+0000001151 00000 n 
 trailer
-<< /Size 6 /Root 1 0 R >>
+<< /Size 8 /Root 1 0 R >>
 startxref
-855
+1560
 %%EOF

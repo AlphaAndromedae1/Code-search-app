@@ -112,8 +112,10 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
     var inDocuments: Bool = false
     /// Pages with searchable text after indexing; -1 until known. 0 means nothing can be found in it.
     var textPages: Int = -1
-    /// Read every page with OCR, ignoring the PDF's own text layer (for PDFs whose text comes out scrambled).
+    /// Read every page with OCR as well as the PDF's own text (for PDFs whose text comes out scrambled).
     var forceOCR: Bool = false
+    /// Pages whose text contains a clause or rule number (like 4.7.4 or 26-700); -1 until known.
+    var clausePages: Int = -1
 
     init(title: String, fileName: String) {
         self.title = title
@@ -137,7 +139,7 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id, title, shortName, category, jurisdiction, edition, fileName, fileSize
         case pageCount, indexedPages, ocrPages, dateAdded, lastPage, notes, sourceURL
-        case modelNumbers, equipmentType, sourceVersion, inDocuments, textPages, forceOCR
+        case modelNumbers, equipmentType, sourceVersion, inDocuments, textPages, forceOCR, clausePages
     }
 
     // Tolerant decoding so future versions can add fields without wiping the library.
@@ -164,10 +166,23 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
         sourceURL = try c.decodeIfPresent(String.self, forKey: .sourceURL) ?? ""
         textPages = try c.decodeIfPresent(Int.self, forKey: .textPages) ?? -1
         forceOCR = try c.decodeIfPresent(Bool.self, forKey: .forceOCR) ?? false
+        clausePages = try c.decodeIfPresent(Int.self, forKey: .clausePages) ?? -1
     }
 
     /// Indexed, but no page had text to search (a scan that OCR couldn't read, or a locked file).
     var hasNoSearchableText: Bool { isIndexed && pageCount > 0 && textPages == 0 }
+
+    /// A code book whose text has words but almost no readable clause numbers: the PDF's font
+    /// for headings doesn't map back to digits, so "4.7.4" can't be found until it's read with OCR.
+    var clauseNumbersUnreadable: Bool {
+        guard isIndexed, !forceOCR, textPages >= 20, clausePages >= 0 else { return false }
+        switch category {
+        case .gas, .oil, .building, .residential, .mechanical, .fire, .plumbing, .energy, .accessibility, .standard:
+            return Double(clausePages) < Double(textPages) * 0.1
+        default:
+            return false
+        }
+    }
 }
 
 /// Details entered for a manufacturer's manual.

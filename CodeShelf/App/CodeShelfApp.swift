@@ -66,11 +66,16 @@ struct CodeShelfApp: App {
         }
         guard let probe = defaults.string(forKey: "searchProbe"), !probe.isEmpty else { return }
         let queries = probe.split(separator: "|").map(String.init)
+        // `-ocrProbe "<title>"`: after the first round of searches, re-read that book with OCR and search again.
+        let ocrTitle = defaults.string(forKey: "ocrProbe") ?? ""
+        let expectedBooks = defaults.integer(forKey: "probeBookCount")
+        var rounds: [String: Any] = [:]
+        var round = 0
         var lastSignature = ""
-        for _ in 0..<200 {
+        for _ in 0..<300 {
             try? await Task.sleep(for: .seconds(2))
-            guard !store.books.isEmpty, !store.hasPendingIndexing else { continue }
-            let signature = store.books.map { "\($0.id)-\($0.indexedPages)" }.sorted().joined(separator: ",")
+            guard !store.books.isEmpty, !store.hasPendingIndexing, store.books.count >= expectedBooks else { continue }
+            let signature = store.books.map { "\($0.id)-\($0.indexedPages)-\($0.forceOCR)" }.sorted().joined(separator: ",")
             guard signature != lastSignature else { continue }
             lastSignature = signature
             var answers: [String: Any] = [:]
@@ -91,7 +96,12 @@ struct CodeShelfApp: App {
                 }
                 answers[query] = ["results": results, "missedCodeBooks": model.missedCodeBooks]
             }
-            writeProbe("search-probe.json", ["bookCount": store.books.count, "queries": answers])
+            rounds["\(round)"] = ["bookCount": store.books.count, "queries": answers]
+            writeProbe("search-probe.json", ["bookCount": store.books.count, "queries": answers, "rounds": rounds])
+            if round == 0, !ocrTitle.isEmpty, let book = store.books.first(where: { $0.title == ocrTitle }) {
+                round = 1
+                store.rereadWithOCR(bookID: book.id)
+            }
         }
         #endif
     }

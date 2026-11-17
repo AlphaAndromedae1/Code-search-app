@@ -32,6 +32,22 @@ while time.time() < deadline:
         pass
     time.sleep(3)
 
+# The app runs its searches, re-reads the B139 sample with OCR, then searches again (search-probe.json).
+probe = {}
+deadline = time.time() + 240
+while time.time() < deadline:
+    try:
+        probe = json.loads((root / "search-probe.json").read_text())
+        if "1" in probe.get("rounds", {}):
+            break
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    time.sleep(3)
+try:
+    books = json.loads((root / "library.json").read_text())["books"]
+except (FileNotFoundError, json.JSONDecodeError, KeyError):
+    pass
+
 print("Library:")
 for b in books:
     print(f"  {b.get('title')!r}: category={b.get('category')} shortName={b.get('shortName')!r} "
@@ -82,17 +98,11 @@ plain = db.execute(
     "SELECT book_id FROM pages WHERE pages MATCH 'venting* OR instructions*' ORDER BY rank"
 ).fetchall()
 print("  bm25 order alone:", [next((b["title"] for b in books if b["id"] == row[0]), row[0]) for row in plain])
-probe = {}
-deadline = time.time() + 90
-while time.time() < deadline:
-    try:
-        probe = json.loads((root / "search-probe.json").read_text())
-        if probe.get("bookCount") == 4:
-            break
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass
-    time.sleep(2)
-answers = probe.get("queries", {})
+rounds = probe.get("rounds", {})
+before_ocr = rounds.get("0", {})
+after_ocr = rounds.get("1", {})
+check(before_ocr.get("bookCount") == 4, "search probe ran with all four books")
+answers = before_ocr.get("queries", {})
 
 
 def ranked_for(query):
@@ -120,6 +130,22 @@ missing = answers.get("7.9.9", {})
 print("  7.9.9:", json.dumps(missing)[:300])
 check(missing.get("results") == [] and missing.get("missedCodeBooks") is True,
       "a clause that isn't in any book says so and explains each code book's status")
+
+# 7.5.1 is printed on the page, but the PDF's text layer has it as "q.w.e" (heading font without digit mapping).
+scrambled = answers.get("7.5.1", {})
+print("  7.5.1 before OCR:", json.dumps(scrambled)[:300])
+check(scrambled.get("results") == [] and scrambled.get("missedCodeBooks") is True,
+      "a clause number the PDF's text scrambles can't be found before OCR (as on the user's B149.1)")
+after = after_ocr.get("queries", {})
+found = after.get("7.5.1", {}).get("results", [])
+print("  7.5.1 after Re-read with OCR:", json.dumps(found, ensure_ascii=False)[:400])
+check(any(r["title"] == B139 and r["tier"] == "Code Books" and r["firstPage"] == 0 and not r["note"] for r in found),
+      "after Re-read with OCR, the scrambled clause number 7.5.1 is found exactly")
+kept = after.get("7.3.1", {}).get("results", [])
+check(any(r["title"] == B139 for r in kept), "after OCR the PDF's own text is still searchable too (7.3.1)")
+b139 = next((b for b in json.loads((root / "library.json").read_text())["books"] if b["title"] == B139), {})
+print(f"  B139 after OCR: forceOCR={b139.get('forceOCR')} ocrPages={b139.get('ocrPages')} clausePages={b139.get('clausePages')}")
+check(b139.get("forceOCR") is True and b139.get("ocrPages", 0) >= 1, "Re-read with OCR is recorded on the book")
 text_pages = {}
 deadline = time.time() + 30
 while time.time() < deadline:

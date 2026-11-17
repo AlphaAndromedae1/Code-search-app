@@ -357,6 +357,7 @@ final class LibraryStore {
             books[i].indexedPages = 0
             books[i].ocrPages = 0
             books[i].textPages = -1
+            books[i].clausePages = -1
             books[i].lastPage = min(books[i].lastPage, max(0, file.pageCount - 1))
             books[i].edition = retrieved
             books[i].sourceURL = sourceURL
@@ -738,6 +739,7 @@ final class LibraryStore {
         books[i].indexedPages = 0
         books[i].ocrPages = 0
         books[i].textPages = -1
+        books[i].clausePages = -1
         saveNow()
         enqueueIndexing(bookID)
     }
@@ -826,8 +828,10 @@ final class LibraryStore {
                 let index = self.index
                 Task { [weak self] in
                     let textPages = await index.textPageCount(bookID: id)
+                    let clausePages = await index.clausePageCount(bookID: id)
                     guard let self, let j = self.books.firstIndex(where: { $0.id == id }) else { return }
                     self.books[j].textPages = textPages
+                    self.books[j].clausePages = clausePages
                     self.saveNow()
                 }
             case .cancelled:
@@ -842,6 +846,7 @@ final class LibraryStore {
                 books[i].indexedPages = 0
                 books[i].ocrPages = 0
                 books[i].textPages = -1
+                books[i].clausePages = -1
                 queue.insert(id, at: 0)
             }
         } else {
@@ -866,6 +871,7 @@ final class LibraryStore {
                 books[i].indexedPages = 0
                 books[i].ocrPages = 0
                 books[i].textPages = -1
+                books[i].clausePages = -1
                 changed = true
             }
         }
@@ -874,11 +880,13 @@ final class LibraryStore {
             await index.deleteBook(id)
         }
         // Books indexed by older versions: find out whether they hold any searchable text.
-        let unknown = books.filter { $0.isIndexed && $0.textPages < 0 }.map(\.id)
+        let unknown = books.filter { $0.isIndexed && ($0.textPages < 0 || $0.clausePages < 0) }.map(\.id)
         for id in unknown {
             let textPages = await index.textPageCount(bookID: id)
+            let clausePages = await index.clausePageCount(bookID: id)
             if let i = books.firstIndex(where: { $0.id == id }) {
                 books[i].textPages = textPages
+                books[i].clausePages = clausePages
                 changed = true
             }
         }

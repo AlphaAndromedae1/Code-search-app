@@ -284,6 +284,11 @@ struct BookRow: View {
                     Text("Waiting to index")
                         .font(.caption2)
                         .foregroundStyle(.orange)
+                } else if book.clauseNumbersUnreadable {
+                    Text("Clause numbers unreadable. Long-press › Re-read with OCR")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .lineLimit(1)
                 }
             }
         }

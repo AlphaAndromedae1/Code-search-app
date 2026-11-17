@@ -154,11 +154,16 @@ struct CodeBookSearchStatus: View {
                     Text(status(of: book))
                         .font(.caption)
                         .foregroundStyle(book.hasNoSearchableText || !book.isIndexed ? Color.orange : Color.secondary)
+                    if book.clauseNumbersUnreadable {
+                        Label("Clause numbers can't be read from this PDF's text (found on only \(book.clausePages) of \(book.textPages) pages). Its headings use a font whose numbers don't come through as text. Re-reading it with OCR fixes this.", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
                     if book.isIndexed && !book.forceOCR {
-                        Button("Re-read This Book with OCR") {
+                        Button(book.clauseNumbersUnreadable ? "Re-read This Book with OCR (Recommended)" : "Re-read This Book with OCR") {
                             store.rereadWithOCR(bookID: book.id)
                         }
-                        .font(.caption)
+                        .font(.caption.weight(book.clauseNumbersUnreadable ? .semibold : .regular))
                     }
                 }
                 .padding(.vertical, 2)

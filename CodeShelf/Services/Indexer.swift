@@ -72,10 +72,12 @@ enum Indexer {
             guard let page = document.page(at: pageIndex) else { return (text: "", usedOCR: false) }
             let text = page.string ?? ""
 
-            // The PDF's own text is scrambled (fonts without a proper character map): read the printed page instead.
+            // Some PDFs print clause numbers in a font that doesn't map back to digits, so the text
+            // has the words but not "4.7.4". Read the printed page too and keep both.
             if forceOCR {
-                if let recognized = recognizeText(on: page), recognized.unicodeScalars.contains(where: { CharacterSet.alphanumerics.contains($0) }) {
-                    return (text: recognized, usedOCR: true)
+                if let recognized = recognizeText(on: page, languageCorrection: false),
+                   recognized.unicodeScalars.contains(where: { CharacterSet.alphanumerics.contains($0) }) {
+                    return (text: text.isEmpty ? recognized : text + "\n" + recognized, usedOCR: true)
                 }
                 return (text: text, usedOCR: false)
             }
@@ -96,7 +98,7 @@ enum Indexer {
     }
 
     /// Renders the page to an image and runs Apple's on-device text recognition.
-    private static func recognizeText(on page: PDFPage) -> String? {
+    private static func recognizeText(on page: PDFPage, languageCorrection: Bool = true) -> String? {
         let bounds = page.bounds(for: .mediaBox)
         guard bounds.width > 0, bounds.height > 0 else { return nil }
         let scale = 2200 / max(bounds.width, bounds.height)
@@ -106,7 +108,8 @@ enum Indexer {
 
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
+        // Off when reading clause numbers, so "4.7.4" isn't "corrected" into a word.
+        request.usesLanguageCorrection = languageCorrection
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
         do {
             try handler.perform([request])

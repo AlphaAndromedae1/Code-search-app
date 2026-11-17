@@ -116,7 +116,7 @@ jobs:
           # Like dropping a PDF into Files › On My iPhone › CodeShelf › Code Books:
           mkdir -p "$DATA/Documents/Code Books"
           cp "Tests/Fixtures/CSA B139-24 Installation code for oil-burning equipment.pdf" "$DATA/Documents/Code Books/"
-          xcrun simctl launch "$UDID" "$BUNDLE" -disableAutomation YES -calcProbe YES -searchProbe "venting instructions|7.3.3|7.4.2|7.9.9" -importOnLaunch "$F/OESC 2024 sample.pdf|$F/2-7-26.pdf|$F/Acme AF100 Furnace Installation Instructions.pdf|$F/CSA B149.1-25 protected.pdf"
+          xcrun simctl launch "$UDID" "$BUNDLE" -disableAutomation YES -calcProbe YES -searchProbe "venting instructions|7.3.3|7.4.2|7.9.9|7.5.1|7.3.1" -ocrProbe "CSA B139-24 Installation code for oil-burning equipment" -probeBookCount 4 -importOnLaunch "$F/OESC 2024 sample.pdf|$F/2-7-26.pdf|$F/Acme AF100 Furnace Installation Instructions.pdf|$F/CSA B149.1-25 protected.pdf"
 
       - name: Verify import, indexing and search
         run: python3 Tests/smoke_check.py "$DATA/Library/Application Support/CodeShelf"

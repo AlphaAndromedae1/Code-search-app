@@ -166,6 +166,7 @@ struct SearchView: View {
     private var indexingStatus: some View {
         let pending = store.codeBooksStillIndexing
         let unreadable = store.books.filter { SearchTier.of($0.category) == .codes && $0.hasNoSearchableText }
+        let noClauseNumbers = store.books.filter { $0.clauseNumbersUnreadable }
         if !pending.isEmpty {
             Label(pendingText(pending), systemImage: "hourglass")
                 .font(.caption)
@@ -179,6 +180,17 @@ struct SearchView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)
                 .padding(.bottom, 6)
+        }
+        if !noClauseNumbers.isEmpty {
+            Label(
+                "Clause numbers can't be read in \(noClauseNumbers.map(\.displayName).joined(separator: ", ")). Long-press it in Library and choose Re-read with OCR so numbers like 4.7.4 can be found.",
+                systemImage: "exclamationmark.triangle"
+            )
+            .font(.caption)
+            .foregroundStyle(.orange)
+            .multilineTextAlignment(.leading)
+            .padding(.horizontal)
+            .padding(.bottom, 6)
         }
         if !unreadable.isEmpty {
             Label(

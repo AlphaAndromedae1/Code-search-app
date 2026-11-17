@@ -164,6 +164,25 @@ actor SearchIndex {
         return String(cString: text)
     }
 
+    /// Pages of a book whose text contains a clause or rule number (4.7.4, 9.10.14.5, 26-700).
+    func clausePageCount(bookID: UUID) -> Int {
+        guard let db else { return 0 }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT body FROM pages WHERE book_id = ?", -1, &stmt, nil) == SQLITE_OK else { return 0 }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, bookID.uuidString, -1, sqliteTransient)
+        guard let pattern = try? NSRegularExpression(pattern: #"(?<![\d.])\d{1,2}\.\d{1,2}\.\d{1,3}(?!\d)|(?<!\d)\d{1,2}-\d{3}(?!\d)"#) else { return 0 }
+        var count = 0
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let raw = sqlite3_column_text(stmt, 0) else { continue }
+            let text = String(cString: raw)
+            if pattern.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil {
+                count += 1
+            }
+        }
+        return count
+    }
+
     /// Pages of a book that hold enough text to be found by a search.
     func textPageCount(bookID: UUID) -> Int {
         guard let db else { return 0 }
