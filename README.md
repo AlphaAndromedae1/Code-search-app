@@ -39,7 +39,7 @@ Your library stays on your device. The app goes online only to check the TSSA, C
 - Bookmarks with notes.
 
 **Tools** (Tools tab)
-- **Pipe Sizing:** follows CSA B149.1-20 Annex A, using the formulas in clause A.3.5 that generate capacity Tables A.1–A.14.
+- **Pipe Sizing:** follows CSA B149.1-20 Annexes A (natural gas) and B (propane), using the formulas in clauses A.3.5 and B.3.5 that generate capacity Tables A.1–A.14 and B.1–B.10.
   - **Pressures:** each natural gas table's pressure and drop:
     - under 7" w.c. (0.5" drop) and 7–14" w.c. (1" drop)
     - 2 psi (1 or 1.5 psi drop)
@@ -50,7 +50,7 @@ Your library stays on your device. The app goes online only to check the TSSA, C
   - **Fittings:** the 20% allowance where the tables include it. For the 5, 10 and 20 psi tables, you enter fittings and they're added as Table A.16 equivalent lengths.
   - **Reading the table:** like the tables, it uses the next larger length (A.3.5) and the first size that covers the load (A.3.7).
   - **Checked against the printed tables:** within ±1 on 97% of the 4,926 values; the rest differ by under 0.15%.
-  - **Propane:** uses the same formulas with propane's properties, but hasn't been checked against B149.1's Annex B tables yet.
+  - **Propane:** follows Annex B (Tables B.1–B.10): 11" w.c. (1" drop), 2 psi (1 psi drop), and 5, 10 and 20 psi, with Cr ≈ 1.260 and 2,520 Btu/ft³. Within ±1 on 98% of the 3,705 values; the rest differ by under 0.16%.
 - **CSST Sizing:** Gastite/FlashShield's own capacity tables (natural gas in ft³/h, propane in MBH):
   - **Natural gas:** 7" w.c. with a 0.5–6" drop, plus 1, 2, 5 and 10 psi.
   - **Propane:** 11" w.c. with a 0.5–3" drop, plus 2, 5 and 10 psi.

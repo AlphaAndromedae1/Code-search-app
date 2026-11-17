@@ -7,14 +7,16 @@ import Foundation
 ///   Low pressure (under 1.5 psig / 10.3 kPa):  Q = K2 · D^2.623 · [ΔH / (Cr · L · F)]^0.541 · (b · z)
 ///   High pressure (1.5 psig and up):           Q = K1 · D^2.623 · [(P1² − P2²) · Y / (Cr · L · F)]^0.541 · (b · z)
 ///
-/// Imperial: K2 = 2313, K1 = 2237, D in inches, ΔH in in. w.c., P in psia, L in ft, b = 1000 Btu/ft³ (natural gas).
+/// Imperial: K2 = 2313, K1 = 2237, D in inches, ΔH in in. w.c., P in psia, L in ft, b in Btu/ft³.
 /// Metric:   K2 = 0.1509, K1 = 0.3576, D in cm, ΔH in Pa, P in kPa absolute, L in m, b · z converts to kW.
-/// Cr = 0.6094 for natural gas, Y = 1. F = 1.2 (a fittings allowance) for Tables A.1–A.4 and A.8–A.11,
-/// F = 1 for A.5–A.7 and A.12–A.14, where fittings are added as equivalent lengths (Table A.16).
-/// Steel tables use Schedule 40 inside diameters; tubing tables use Type K copper.
+/// Natural gas (Annex A): Cr = 0.6094, b = 1000 Btu/ft³. Propane (Annex B, clause B.3.5, same formulas):
+/// Cr ≈ 1.260 and b = 2520 Btu/ft³. Y = 1. F = 1.2 (a fittings allowance) for Tables A.1–A.4, A.8–A.11,
+/// B.1, B.2, B.6 and B.7; F = 1 for the 5, 10 and 20 psi tables, where fittings are added as equivalent
+/// lengths (Tables A.16 / B.11). Steel tables use Schedule 40 inside diameters; tubing tables use Type K copper.
 ///
-/// As in clause A.3.5, the run is rounded up to the next length the tables list, and capacities are
-/// rounded to whole MBH (kW). Checked against the printed tables: within rounding (±1) of every value.
+/// As in clauses A.3.5 / B.3.5, the run is rounded up to the next length the tables list, and capacities
+/// are rounded to whole MBH (kW). Checked against the printed tables A.1–A.14 and B.1–B.10 (imperial and
+/// metric): about 97% of values agree within ±1 and the rest within 0.16%.
 enum FuelGas: String, CaseIterable, Identifiable, Codable, Sendable {
     case natural
     case propane
@@ -28,25 +30,30 @@ enum FuelGas: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
-    /// Cr: factor for viscosity, density and temperature (B149.1 A.3.5: 0.6094 for natural gas).
-    var cr: Double {
+    /// Cr: factor for viscosity, density and temperature. B149.1 states 0.6094 for natural gas and 1.260 for
+    /// propane (rounded from Cr = K3 · S · T · (Z/S)^0.152); the propane tables were generated with the
+    /// unrounded value, which these reproduce (imperial and metric differ slightly, as in the tables).
+    func cr(_ units: UnitSystem) -> Double {
         switch self {
         case .natural: return 0.6094
-        case .propane: return 1.2462
+        case .propane: return units == .imperial ? 1.26044 : 1.2608
         }
     }
 
-    /// Calorific value used to turn volume into energy (B149.1 A.2.2: 1000 Btu/ft³ for natural gas).
+    /// Calorific value used to turn volume into energy (B149.1 A.2.2 / B.2.2).
     var btuPerCubicFoot: Double {
         switch self {
         case .natural: return 1000
-        case .propane: return 2516
+        case .propane: return 2520
         }
     }
 
     /// b · z in the metric formula: kW per m³/h of gas.
     var kWPerCubicMetrePerHour: Double {
-        btuPerCubicFoot * 0.010354
+        switch self {
+        case .natural: return 10.354
+        case .propane: return 26.097
+        }
     }
 }
 
@@ -180,18 +187,21 @@ struct GasSystem: Identifiable, Hashable, Sendable {
         GasSystem(id: "ng-a7", gas: .natural, inlet: 20, inletUnit: .psi, drop: 10, dropUnit: .psi,
                   inletKPa: 140, dropKPa: 70, fittingFactor: 1, steelTable: "A.7", tubingTable: "A.14",
                   note: "20 psi system"),
-        GasSystem(id: "lp-11wc-05", gas: .propane, inlet: 11, inletUnit: .inchesWC, drop: 0.5, dropUnit: .inchesWC,
-                  inletKPa: 2.74, dropKPa: 0.125, fittingFactor: 1.2, steelTable: nil, tubingTable: nil,
-                  note: "After the second-stage regulator"),
-        GasSystem(id: "lp-11wc-1", gas: .propane, inlet: 11, inletUnit: .inchesWC, drop: 1, dropUnit: .inchesWC,
-                  inletKPa: 2.74, dropKPa: 0.25, fittingFactor: 1.2, steelTable: nil, tubingTable: nil,
-                  note: "After the second stage, larger drop where appliances allow it"),
-        GasSystem(id: "lp-2psi", gas: .propane, inlet: 2, inletUnit: .psi, drop: 1, dropUnit: .psi,
-                  inletKPa: 14, dropKPa: 7, fittingFactor: 1.2, steelTable: nil, tubingTable: nil,
+        GasSystem(id: "lp-b1", gas: .propane, inlet: 11, inletUnit: .inchesWC, drop: 1, dropUnit: .inchesWC,
+                  inletKPa: 2.7, dropKPa: 0.25, fittingFactor: 1.2, steelTable: "B.1", tubingTable: "B.6",
+                  note: "After the second-stage regulator (11\" w.c.)"),
+        GasSystem(id: "lp-b2", gas: .propane, inlet: 2, inletUnit: .psi, drop: 1, dropUnit: .psi,
+                  inletKPa: 14, dropKPa: 7, fittingFactor: 1.2, steelTable: "B.2", tubingTable: "B.7",
                   note: "2 psi system, to the line regulator"),
-        GasSystem(id: "lp-10psi", gas: .propane, inlet: 10, inletUnit: .psi, drop: 1, dropUnit: .psi,
-                  inletKPa: 70, dropKPa: 7, fittingFactor: 1, steelTable: nil, tubingTable: nil,
-                  note: "First stage to second stage (10 psi)"),
+        GasSystem(id: "lp-b3", gas: .propane, inlet: 5, inletUnit: .psi, drop: 2.5, dropUnit: .psi,
+                  inletKPa: 34, dropKPa: 17, fittingFactor: 1, steelTable: "B.3", tubingTable: "B.8",
+                  note: "5 psi system"),
+        GasSystem(id: "lp-b4", gas: .propane, inlet: 10, inletUnit: .psi, drop: 5, dropUnit: .psi,
+                  inletKPa: 70, dropKPa: 35, fittingFactor: 1, steelTable: "B.4", tubingTable: "B.9",
+                  note: "10 psi, first stage to second stage"),
+        GasSystem(id: "lp-b5", gas: .propane, inlet: 20, inletUnit: .psi, drop: 10, dropUnit: .psi,
+                  inletKPa: 140, dropKPa: 70, fittingFactor: 1, steelTable: "B.5", tubingTable: "B.10",
+                  note: "20 psi system"),
     ]
 
     static func presets(for gas: FuelGas) -> [GasSystem] {
@@ -288,12 +298,12 @@ enum PipeSizing {
             let flow: Double // ft³/h
             if system.usesLowPressureEquation {
                 let dropWC = system.dropPSI * PressureUnit.inchesWCPerPSI
-                flow = 2313 * pow(d, 2.623) * pow(dropWC / (gas.cr * length * F), 0.541)
+                flow = 2313 * pow(d, 2.623) * pow(dropWC / (gas.cr(units) * length * F), 0.541)
             } else {
                 let p1 = system.inletPSI + 14.696
                 let p2 = p1 - system.dropPSI
                 guard p2 > 0 else { return 0 }
-                flow = 2237 * pow(d, 2.623) * pow((p1 * p1 - p2 * p2) / (gas.cr * length * F), 0.541)
+                flow = 2237 * pow(d, 2.623) * pow((p1 * p1 - p2 * p2) / (gas.cr(units) * length * F), 0.541)
             }
             return flow * gas.btuPerCubicFoot / 1000
         case .metric:
@@ -301,12 +311,12 @@ enum PipeSizing {
             let flow: Double // m³/h
             if system.usesLowPressureEquation {
                 let dropPa = system.dropKPa * 1000
-                flow = 0.1509 * pow(cm, 2.623) * pow(dropPa / (gas.cr * length * F), 0.541)
+                flow = 0.1509 * pow(cm, 2.623) * pow(dropPa / (gas.cr(units) * length * F), 0.541)
             } else {
                 let p1 = system.inletKPa + 101.325
                 let p2 = p1 - system.dropKPa
                 guard p2 > 0 else { return 0 }
-                flow = 0.3576 * pow(cm, 2.623) * pow((p1 * p1 - p2 * p2) / (gas.cr * length * F), 0.541)
+                flow = 0.3576 * pow(cm, 2.623) * pow((p1 * p1 - p2 * p2) / (gas.cr(units) * length * F), 0.541)
             }
             return flow * gas.kWPerCubicMetrePerHour
         }
@@ -350,13 +360,13 @@ enum PipeSizing {
             let flow = load * 1000 / gas.btuPerCubicFoot
             if system.usesLowPressureEquation {
                 let term = pow(flow / (2313 * pow(d, 2.623)), 1 / 0.541)
-                let dropWC = term * gas.cr * length * F
+                let dropWC = term * gas.cr(units) * length * F
                 // In the system's own drop unit (toPSI(1) = psi per unit).
                 return (dropWC / PressureUnit.inchesWCPerPSI) / system.dropUnit.toPSI(1)
             }
             let term = pow(flow / (2237 * pow(d, 2.623)), 1 / 0.541)
             let p1 = system.inletPSI + 14.696
-            let p2Squared = p1 * p1 - term * gas.cr * length * F
+            let p2Squared = p1 * p1 - term * gas.cr(units) * length * F
             guard p2Squared > 0 else { return nil }
             let dropPSI = p1 - sqrt(p2Squared)
             return dropPSI / system.dropUnit.toPSI(1)
@@ -365,11 +375,11 @@ enum PipeSizing {
             let cm = d * 2.54
             if system.usesLowPressureEquation {
                 let term = pow(flow / (0.1509 * pow(cm, 2.623)), 1 / 0.541)
-                return term * gas.cr * length * F / 1000 // kPa
+                return term * gas.cr(units) * length * F / 1000 // kPa
             }
             let term = pow(flow / (0.3576 * pow(cm, 2.623)), 1 / 0.541)
             let p1 = system.inletKPa + 101.325
-            let p2Squared = p1 * p1 - term * gas.cr * length * F
+            let p2Squared = p1 * p1 - term * gas.cr(units) * length * F
             guard p2Squared > 0 else { return nil }
             return p1 - sqrt(p2Squared) // kPa
         }

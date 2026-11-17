@@ -183,6 +183,12 @@ for key, expected, what in [
     ("A.10 10ft", [222, 458, 933], "2 psi, 1 psi drop, Type K tubing"),
     ("A.2b 3m", [67, 141, 265], "metric: 1.75-3.5 kPa, 250 Pa drop, steel, kW"),
     ("A.3b 3m", [430, 899, 1693], "metric: 14 kPa, 7 kPa drop, steel, kW"),
+    ("B.1 10ft", [386, 807, 1520], "propane, 11 in. w.c., 1 in. drop, steel"),
+    ("B.2 10ft", [2450, 5122, 9649], "propane, 2 psi, 1 psi drop, steel"),
+    ("B.4 10ft", [7658, 16014, 30166], "propane, 10 psi, 5 psi drop, steel"),
+    ("B.6 10ft", [60, 123, 250], "propane, 11 in. w.c., Type K tubing"),
+    ("B.1b 3m", [114, 239, 450], "propane metric: 2.7 kPa, 250 Pa drop, steel, kW"),
+    ("B.4b 3m", [2290, 4788, 9019], "propane metric: 70 kPa, 35 kPa drop, steel, kW"),
 ]:
     check(near(pipe.get(key, []), expected), f"pipe sizing matches B149.1 Table {key.split()[0]} ({what}): {pipe.get(key, [])[:len(expected)]}")
 check(pipe.get("exampleSize") == '1"' and pipe.get("exampleRow") == 50,

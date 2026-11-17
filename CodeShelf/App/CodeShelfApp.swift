@@ -124,6 +124,9 @@ struct CodeShelfApp: App {
             "A.5 10ft": row("ng-a5", .steelSch40, 10), "A.7 10ft": row("ng-a7", .steelSch40, 10),
             "A.8 10ft": row("ng-a1", .copperK, 10), "A.10 10ft": row("ng-a3", .copperK, 10),
             "A.2b 3m": row("ng-a2", .steelSch40, 3, .metric), "A.3b 3m": row("ng-a3", .steelSch40, 3, .metric),
+            "B.1 10ft": row("lp-b1", .steelSch40, 10), "B.2 10ft": row("lp-b2", .steelSch40, 10),
+            "B.4 10ft": row("lp-b4", .steelSch40, 10), "B.6 10ft": row("lp-b1", .copperK, 10),
+            "B.1b 3m": row("lp-b1", .steelSch40, 3, .metric), "B.4b 3m": row("lp-b4", .steelSch40, 3, .metric),
             "exampleSize": pick?.size ?? "", "exampleRow": pick?.rowLength ?? 0,
             "fittingRows": withFittings.map(\.rowLength),
         ]

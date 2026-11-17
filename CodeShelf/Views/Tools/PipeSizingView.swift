@@ -178,8 +178,8 @@ struct PipeSizingView: View {
         var parts: [String] = [system.note + "."]
         if let table = system.table(for: material, units: units) {
             parts.append("Same as CSA B149.1 \(table).")
-        } else if system.gas == .propane {
-            parts.append("Propane uses the same B149.1 formulas with propane's properties (Cr 1.2462, 2,516 Btu/ft³). Its Annex B tables haven't been checked yet.")
+        } else if system.id == "custom" {
+            parts.append("Calculated with the same B149.1 formulas as the tables.")
         }
         parts.append(system.includesFittings
             ? "Includes an allowance for a reasonable number of fittings (pipe length × 1.2)."
@@ -278,7 +278,7 @@ struct PipeSizingView: View {
 
     private var methodSection: some View {
         Section {
-            Text("Calculated with the formulas in CSA B149.1-20 clause A.3.5, which generate capacity Tables A.1 to A.14. It uses Schedule 40 and Type K copper inside diameters, 1,000 Btu/ft³ natural gas at relative density 0.6, and the tables' 20% fittings allowance where they include one. Like the tables, it reads the next larger length (A.3.5) and picks the first size whose capacity covers the load (A.3.7). Results match the printed tables to within rounding.")
+            Text("Calculated with the formulas in CSA B149.1-20 clauses A.3.5 and B.3.5, which generate capacity Tables A.1–A.14 (natural gas, 1,000 Btu/ft³, relative density 0.6) and B.1–B.10 (propane, 2,520 Btu/ft³, relative density 1.52). It uses Schedule 40 and Type K copper inside diameters, and the tables' 20% fittings allowance where they include one. Like the tables, it reads the next larger length and picks the first size whose capacity covers the load. Results match the printed tables to within rounding.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
