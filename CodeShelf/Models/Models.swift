@@ -110,6 +110,8 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
     /// True when `fileName` is a path inside Documents (On My iPhone › CodeShelf in Files);
     /// false for older copies kept in the app's private storage.
     var inDocuments: Bool = false
+    /// Pages with searchable text after indexing; -1 until known. 0 means nothing can be found in it.
+    var textPages: Int = -1
 
     init(title: String, fileName: String) {
         self.title = title
@@ -133,7 +135,7 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id, title, shortName, category, jurisdiction, edition, fileName, fileSize
         case pageCount, indexedPages, ocrPages, dateAdded, lastPage, notes, sourceURL
-        case modelNumbers, equipmentType, sourceVersion, inDocuments
+        case modelNumbers, equipmentType, sourceVersion, inDocuments, textPages
     }
 
     // Tolerant decoding so future versions can add fields without wiping the library.
@@ -158,7 +160,11 @@ struct Book: Identifiable, Codable, Hashable, Sendable {
         sourceVersion = try c.decodeIfPresent(String.self, forKey: .sourceVersion) ?? ""
         inDocuments = try c.decodeIfPresent(Bool.self, forKey: .inDocuments) ?? false
         sourceURL = try c.decodeIfPresent(String.self, forKey: .sourceURL) ?? ""
+        textPages = try c.decodeIfPresent(Int.self, forKey: .textPages) ?? -1
     }
+
+    /// Indexed, but no page had text to search (a scan that OCR couldn't read, or a locked file).
+    var hasNoSearchableText: Bool { isIndexed && pageCount > 0 && textPages == 0 }
 }
 
 /// Details entered for a manufacturer's manual.

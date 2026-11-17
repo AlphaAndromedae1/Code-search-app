@@ -10,6 +10,7 @@ on:
       - "CodeShelf/Resources/FuelCatalog.json"
       - "CodeShelf/Services/UpdatesStore.swift"
       - "CodeShelf/Services/Ontario.swift"
+      - "CodeShelf/Services/FuelPrices.swift"
       - "Tests/check_links.py"
       - ".github/workflows/check-links.yml"
   workflow_dispatch:

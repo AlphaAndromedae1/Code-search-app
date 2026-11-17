@@ -116,7 +116,7 @@ jobs:
           # Like dropping a PDF into Files › On My iPhone › CodeShelf › Code Books:
           mkdir -p "$DATA/Documents/Code Books"
           cp "Tests/Fixtures/CSA B139-24 Installation code for oil-burning equipment.pdf" "$DATA/Documents/Code Books/"
-          xcrun simctl launch "$UDID" "$BUNDLE" -disableAutomation YES -importOnLaunch "$F/OESC 2024 sample.pdf|$F/2-7-26.pdf|$F/Acme AF100 Furnace Installation Instructions.pdf|$F/CSA B149.1-25 protected.pdf"
+          xcrun simctl launch "$UDID" "$BUNDLE" -disableAutomation YES -calcProbe YES -searchProbe "venting instructions" -importOnLaunch "$F/OESC 2024 sample.pdf|$F/2-7-26.pdf|$F/Acme AF100 Furnace Installation Instructions.pdf|$F/CSA B149.1-25 protected.pdf"
 
       - name: Verify import, indexing and search
         run: python3 Tests/smoke_check.py "$DATA/Library/Application Support/CodeShelf"
@@ -132,6 +132,13 @@ jobs:
             echo "::error::CodeShelf is not running after relaunch"
             exit 1
           fi
+
+      - name: Fuel prices download on iOS (report)
+        continue-on-error: true
+        run: |
+          xcrun simctl terminate "$UDID" com.personal.codeshelf || true
+          xcrun simctl launch "$UDID" com.personal.codeshelf -disableAutomation YES -fuelProbe YES
+          python3 Tests/fuel_check.py "$DATA/Library/Application Support/CodeShelf"
 
       - name: Fuel Equipment Library downloads on iOS (report)
         continue-on-error: true

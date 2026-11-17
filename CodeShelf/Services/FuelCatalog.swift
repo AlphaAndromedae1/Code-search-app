@@ -12,6 +12,12 @@ struct EquipmentDoc: Identifiable, Decodable, Hashable, Sendable {
     let url: String?
     /// Search used when there is no stable direct link.
     let search: String?
+    /// Library category when it isn't a manufacturer's document (e.g. "bulletin" for a TSSA advisory).
+    let category: String?
+
+    var libraryCategory: CodeCategory {
+        category.flatMap(CodeCategory.init(rawValue:)) ?? .manufacturer
+    }
 
     var downloadURL: URL? {
         guard let url else { return nil }
@@ -88,7 +94,7 @@ final class EquipmentLibrary {
     func savedBook(for doc: EquipmentDoc, in store: LibraryStore) -> Book? {
         if let url = doc.downloadURL, let book = store.book(sourceURL: url) { return book }
         return store.books.first { book in
-            book.category == .manufacturer && book.jurisdiction == doc.manufacturer && book.title == doc.title
+            book.category == doc.libraryCategory && book.jurisdiction == doc.manufacturer && book.title == doc.title
         }
     }
 
@@ -162,11 +168,11 @@ final class EquipmentLibrary {
             pdfData: data,
             title: doc.title,
             shortName: "",
-            category: .manufacturer,
+            category: doc.libraryCategory,
             jurisdiction: doc.manufacturer,
             sourceURL: url.absoluteString,
             replacing: existingID,
-            manual: doc.manualInfo,
+            manual: doc.libraryCategory == .manufacturer ? doc.manualInfo : nil,
             sourceVersion: version
         )
         if !saved { status[doc.id] = .failed("Couldn't save the PDF") }

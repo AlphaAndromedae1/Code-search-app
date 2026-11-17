@@ -69,60 +69,58 @@ struct CompareView: View {
     @FocusState private var queryFocused: Bool
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if store.books.isEmpty {
-                    ContentUnavailableView(
-                        "Nothing to Compare Yet",
-                        systemImage: "rectangle.split.2x1",
-                        description: Text("Import your code books, then view any two side by side here — for example the OESC and the CE Code, or the OBC and your municipality's by-law.")
-                    )
-                } else {
-                    VStack(spacing: 0) {
-                        searchBar
-                        GeometryReader { geometry in
-                            let wide = geometry.size.width > geometry.size.height * 1.1
-                            let layout = wide ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
-                            layout {
-                                CompareColumn(pane: top) { id in pick(id, for: top) }
-                                Rectangle()
-                                    .fill(Color(uiColor: .separator))
-                                    .frame(width: wide ? 1 : nil, height: wide ? nil : 1)
-                                CompareColumn(pane: bottom) { id in pick(id, for: bottom) }
-                            }
+        Group {
+            if store.books.isEmpty {
+                ContentUnavailableView(
+                    "Nothing to Compare Yet",
+                    systemImage: "rectangle.split.2x1",
+                    description: Text("Import your code books, then view any two side by side here — for example the OESC and the CE Code, or the OBC and your municipality's by-law.")
+                )
+            } else {
+                VStack(spacing: 0) {
+                    searchBar
+                    GeometryReader { geometry in
+                        let wide = geometry.size.width > geometry.size.height * 1.1
+                        let layout = wide ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+                        layout {
+                            CompareColumn(pane: top) { id in pick(id, for: top) }
+                            Rectangle()
+                                .fill(Color(uiColor: .separator))
+                                .frame(width: wide ? 1 : nil, height: wide ? nil : 1)
+                            CompareColumn(pane: bottom) { id in pick(id, for: bottom) }
                         }
                     }
                 }
             }
-            .navigationTitle("Compare")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button {
-                        swapPanes()
-                    } label: {
-                        Label("Swap", systemImage: "arrow.up.arrow.down")
-                    }
-                    .disabled(top.bookID == nil && bottom.bookID == nil)
-
-                    Button {
-                        showLinkSheet = true
-                    } label: {
-                        Label("Link These Pages", systemImage: "link.badge.plus")
-                    }
-                    .disabled(top.bookID == nil || bottom.bookID == nil)
+        }
+        .navigationTitle("Compare")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Button {
+                    swapPanes()
+                } label: {
+                    Label("Swap", systemImage: "arrow.up.arrow.down")
                 }
+                .disabled(top.bookID == nil && bottom.bookID == nil)
+
+                Button {
+                    showLinkSheet = true
+                } label: {
+                    Label("Link These Pages", systemImage: "link.badge.plus")
+                }
+                .disabled(top.bookID == nil || bottom.bookID == nil)
             }
-            .sheet(isPresented: $showLinkSheet) {
-                LinkPageSheet(refs: [top.pageRef, bottom.pageRef].compactMap { $0 })
-            }
-            .onAppear {
-                apply(router.compareRequest)
-                fillEmptyPanes()
-            }
-            .onChange(of: router.compareRequest) { _, request in
-                apply(request)
-            }
+        }
+        .sheet(isPresented: $showLinkSheet) {
+            LinkPageSheet(refs: [top.pageRef, bottom.pageRef].compactMap { $0 })
+        }
+        .onAppear {
+            apply(router.compareRequest)
+            fillEmptyPanes()
+        }
+        .onChange(of: router.compareRequest) { _, request in
+            apply(request)
         }
     }
 

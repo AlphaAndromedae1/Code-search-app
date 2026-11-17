@@ -76,6 +76,65 @@ check(oil_code is not None and clause_hits == [(oil_code["id"],)], "'7.3.1' find
 manual_hits = db.execute("SELECT book_id FROM pages WHERE pages MATCH 'clearance* combustible*'").fetchall()
 check(manual is not None and manual_hits == [(manual["id"],)], "'clearance combustible' finds the furnace manual")
 
+# Ranking: code books come before manufacturer instructions even when a manual matches better.
+# 'venting instructions' (any word): the furnace manual matches both words three times; B139 only 'venting'.
+plain = db.execute(
+    "SELECT book_id FROM pages WHERE pages MATCH 'venting* OR instructions*' ORDER BY rank"
+).fetchall()
+print("  bm25 order alone:", [next((b["title"] for b in books if b["id"] == row[0]), row[0]) for row in plain])
+probe = {}
+deadline = time.time() + 60
+while time.time() < deadline:
+    try:
+        probe = json.loads((root / "search-probe.json").read_text())
+        if probe.get("bookCount") == 4:
+            break
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    time.sleep(2)
+ranked = [(r["title"], r["tier"]) for r in probe.get("results", [])]
+print("  Search tab order:", ranked)
+titles = [t for t, _ in ranked]
+check(len(ranked) >= 2 and ranked[0] == ("CSA B139-24 Installation code for oil-burning equipment", "Code Books")
+      and "Acme AF100 Furnace Installation Instructions" in titles
+      and titles.index("CSA B139-24 Installation code for oil-burning equipment") < titles.index("Acme AF100 Furnace Installation Instructions"),
+      "Search lists the code book before the manufacturer manual")
+check(dict(ranked).get("Acme AF100 Furnace Installation Instructions") == "Manufacturer Instructions",
+      "manual results are grouped under Manufacturer Instructions")
+text_pages = {}
+deadline = time.time() + 30
+while time.time() < deadline:
+    try:
+        text_pages = {b["title"]: b.get("textPages", -1) for b in json.loads((root / "library.json").read_text())["books"]}
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        pass
+    if text_pages and all(v >= 0 for v in text_pages.values()):
+        break
+    time.sleep(2)
+print("  searchable pages:", text_pages)
+check(bool(text_pages) and all(v >= 1 for v in text_pages.values()),
+      "every indexed book records its searchable pages (none flagged as unreadable)")
+
+# Calculators (same Swift code the Tools tab runs).
+try:
+    calc = json.loads((root / "calc-probe.json").read_text())
+except (FileNotFoundError, json.JSONDecodeError):
+    calc = {}
+print("  calculators:", json.dumps(calc))
+steel10 = calc.get("steelNG10ft", [])
+steel100 = calc.get("steelNG100ft", [])
+check(len(steel10) >= 4 and abs(steel10[0] - 172) <= 4 and abs(steel10[1] - 360) <= 8 and abs(steel10[2] - 678) <= 14,
+      "natural gas, 1/2-3/4-1 in. steel at 10 ft, 0.5 in. w.c. drop ≈ 172 / 360 / 678 ft³/h (code table values)")
+check(len(steel100) >= 3 and abs(steel100[0] - 50) <= 2 and abs(steel100[1] - 105) <= 3 and abs(steel100[2] - 198) <= 5,
+      "natural gas, steel at 100 ft ≈ 50 / 105 / 198 ft³/h (code table values)")
+lp = calc.get("steelLP10psi10ftMBH", [])
+check(len(lp) >= 1 and 3300 <= lp[0] <= 3450, "propane 10 psi, 1 psi drop, 1/2 in. steel at 10 ft ≈ 3,370 MBH (equation 4-2)")
+csst = calc.get("csst", {})
+check(csst.get("tables") == 20, "all 20 Gastite CSST tables load")
+check(csst.get("size") == '1"' and csst.get("column") == 40,
+      "CSST: 100,000 BTU/h, 28 ft + 2 extra fittings -> 40 ft column -> 1 in.")
+check(csst.get("propane10psiSize") == '1/2"', "CSST: propane 10 psi, 400 MBH at 100 ft -> 1/2 in.")
+
 # The FileOpen-protected fixture must be refused with a clear explanation, not silently.
 log_text = (root / "import-log.txt").read_text() if (root / "import-log.txt").exists() else ""
 print("Import log (last lines):")

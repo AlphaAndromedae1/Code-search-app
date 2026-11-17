@@ -17,12 +17,13 @@ Your library stays on your device. The app goes online only to check the TSSA, C
 - Every page is indexed for full-text search in the background. Scanned PDFs (no selectable text) are read with Apple's on-device text recognition (OCR).
 
 **Search everything**
-- One search box across every book, with results grouped by book and best matches first. Snippets highlight what matched.
+- One search box across every book. **Code books always come first**, then bulletins, then manufacturer instructions, each grouped by book with the best matches first. A long manual can't push your code book off the list. Snippets highlight what matched.
+- Code books are indexed before manuals and bulletins. If one is still being indexed, Search names it and shows how far along it is. A PDF with no readable text (a scan without OCR) is flagged so you know why nothing in it turns up.
 - Rule, article and clause numbers match exactly: `26-700` finds Rule 26-700, `9.10.14.5` finds that article (not 9.10.14.50), and `6.18.2` finds that B149 clause.
 - `smoke alarm` finds pages with both words, including word starts like *alarms*.
 - `"means of egress"` matches an exact phrase.
 - `egress OR exit` matches either word. You can also switch to "match any word" in the filter menu.
-- Filter by category chips (Building, Fire, Municipal…) or pick specific books.
+- Filter with the **Code Books** chip (every code, no manuals) or a category chip (Gas & Propane, Fuel Oil, Manufacturer Instructions…), or pick specific books.
 - Tapping a result opens the page with your search terms highlighted.
 
 **Reader**
@@ -32,7 +33,25 @@ Your library stays on your device. The app goes online only to check the TSSA, C
 - **Find in Other Books:** select text on the page (like a section number) and tap the books button. CodeShelf searches every other code book for it. Tap a result to open it, and use Back to return.
 - Bookmarks with notes.
 
-**Compare**
+**Tools** (Tools tab)
+- **Pipe Sizing:** steel (Schedule 40) or copper tubing (Type L or K) for natural gas or propane. It uses the longest-length method, with the run in feet or metres and loads in BTU/h or kW for each appliance. Pressure presets:
+  - **Natural gas:** 7" w.c. (0.5" or 1" drop), 2 psi (1 psi drop), 5 psi (3.5 psi drop), 10 psi (1 psi drop).
+  - **Propane:** 11" w.c. (0.5" or 1" drop), 2 psi (1 psi drop), **10 psi first stage to second stage** (1 psi drop).
+  - **Custom:** any pressure and drop.
+  - **Results:** the smallest size that carries the load, the pressure drop at that load, and every size's capacity at that length.
+  - **Method:** the code's gas flow equations (IFGC 402.4 equations 4-1/4-2, NFPA 54) with actual inside diameters, within a few percent of the tables. Confirm against the CSA B149.1 tables.
+- **CSST Sizing:** Gastite/FlashShield's own capacity tables (natural gas in ft³/h, propane in MBH):
+  - **Natural gas:** 7" w.c. with a 0.5–6" drop, plus 1, 2, 5 and 10 psi.
+  - **Propane:** 11" w.c. with a 0.5–3" drop, plus 2, 5 and 10 psi.
+  - **Method:** reads the next length column up and adds the fittings allowance (L = 1.3n for each fitting beyond the four bends and two end fittings the tables include). Shows the EHD of each size.
+  - **Other brands:** TracPipe and WARDFlex have different EHDs, so use their tables in the Fuel Equipment Library.
+- **Fuel Prices (CAD):** this week's propane, furnace oil, regular and premium gasoline, diesel and dyed diesel, in cents per litre with the change from last week. Pick the Ontario average or your area.
+  - **Gasoline, diesel and auto propane:** the Ontario Ministry of Energy's weekly survey of 14 markets.
+  - **Furnace oil:** Natural Resources Canada's weekly prices for the Ontario cities it surveys.
+  - **Dyed diesel:** an estimate, since no public survey reports it. It's clear diesel minus Ontario's 9.0¢/L diesel tax and the HST on it (10.2¢/L, adjustable).
+- **Compare** (below) is in Tools too.
+
+**Compare** (Tools → Compare)
 - Two books side by side (stacked on iPhone portrait, side by side in landscape and on iPad).
 - One search box searches both books, and each side jumps to its best match. Use ▲▼ to step through matches.
 - Swap sides, or **Link these pages** to save a cross-reference.
@@ -46,7 +65,8 @@ Your library stays on your device. The app goes online only to check the TSSA, C
 - Saving is one page at a time, on request, like "Print → Save as PDF". The app doesn't bulk-download whole sites.
 
 **Fuel Equipment Library** (Library → + → Fuel Equipment Library)
-- Manufacturer installation instructions for **CSST** (Gastite/FlashShield, WARDFlex, TracPipe CounterStrike), **ULC S636 venting** (DuraVent PolyPro, IPEX System 636, Centrotherm InnoFlue), **propane regulators** (RegO, Fisher R600/R622/R632, R122H/R222H/R232, 912/Y200, Marshall Excelsior), **relief valves** (Fisher H100 and H series, RegO) and **propane tanks & cylinders** (Manchester Tank, RegO, Worthington).
+- Manufacturer installation instructions for **CSST** (Gastite/FlashShield, WARDFlex, TracPipe CounterStrike), **ULC S636 venting** (DuraVent PolyPro, IPEX System 636, Centrotherm InnoFlue), **propane regulators** (RegO, Fisher R600/R622/R632, R122H/R222H/R232, 912/Y200, Marshall Excelsior), **relief valves** (Fisher H100 and H series, RegO) and **propane tanks & cylinders** (Manchester Tank, Worthington aboveground/underground ASME tank specifications, Trinity, Pro-Par, RegO, plus TSSA advisory FS-258-21 on approval of underground propane tanks).
+- Trinity and Pro-Par don't post their tank instructions publicly, so their entries open a search. Save the PDF your supplier gives you (or scan the paper copy) and it's kept with your manuals.
 - Documents with a direct manufacturer link are downloaded automatically and re-downloaded when the manufacturer posts a newer version (bookmarks and links are kept). The others open a search for the manufacturer's copy; once you save it, it's kept with your manuals.
 - The list lives in `CodeShelf/Resources/FuelCatalog.json`; the **Check links** workflow verifies every link weekly.
 
@@ -170,5 +190,8 @@ CodeShelf/
     WebPageCapture.swift    Saves a browsed page as a searchable PDF
     UpdatesStore.swift      Followed bulletin sources, new-item detection, rule-number matching
     Ontario.swift           e-Laws regulations and municipal by-law search links
-  Views/                    Library, Search, Reader, Compare, Saved, Updates, Web browser
+    PipeSizing.swift        Steel/copper gas pipe capacity (IFGC 402.4 equations 4-1 and 4-2)
+    CSSTSizing.swift        CSST lookup in Resources/CSSTSizing.json (Gastite/FlashShield tables)
+    FuelPrices.swift        Ontario fuel price survey + NRCan furnace oil, cached for offline use
+  Views/                    Library, Search, Reader, Tools (calculators, fuel prices, Compare), Saved, Updates, Web browser
 ```

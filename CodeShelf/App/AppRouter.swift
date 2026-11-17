@@ -3,9 +3,17 @@ import SwiftUI
 enum AppTab: Hashable {
     case library
     case search
-    case compare
+    case tools
     case saved
     case updates
+}
+
+/// Screens inside the Tools tab.
+enum ToolRoute: Hashable {
+    case pipeSizing
+    case csstSizing
+    case fuelPrices
+    case compare
 }
 
 struct CompareRequest: Equatable {
@@ -19,10 +27,12 @@ struct CompareRequest: Equatable {
 @Observable
 final class AppRouter {
     var selectedTab: AppTab = .library
+    var toolsPath: [ToolRoute] = []
     var compareRequest: CompareRequest?
 
     func openInCompare(left: PageRef?, right: PageRef?) {
         compareRequest = CompareRequest(left: left, right: right)
-        selectedTab = .compare
+        toolsPath = [.compare]
+        selectedTab = .tools
     }
 }

@@ -152,6 +152,17 @@ actor SearchIndex {
         return hits
     }
 
+    /// Pages of a book that hold enough text to be found by a search.
+    func textPageCount(bookID: UUID) -> Int {
+        guard let db else { return 0 }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT count(*) FROM pages WHERE book_id = ? AND length(body) > 40", -1, &stmt, nil) == SQLITE_OK else { return 0 }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, bookID.uuidString, -1, sqliteTransient)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+        return Int(sqlite3_column_int64(stmt, 0))
+    }
+
     func pageCountsByBook() -> [UUID: Int] {
         guard let db else { return [:] }
         var stmt: OpaquePointer?

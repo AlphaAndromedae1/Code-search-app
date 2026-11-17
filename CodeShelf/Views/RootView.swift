@@ -18,9 +18,9 @@ struct RootView: View {
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(AppTab.search)
 
-            CompareView()
-                .tabItem { Label("Compare", systemImage: "rectangle.split.2x1") }
-                .tag(AppTab.compare)
+            ToolsView()
+                .tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
+                .tag(AppTab.tools)
 
             SavedView()
                 .tabItem { Label("Saved", systemImage: "bookmark") }

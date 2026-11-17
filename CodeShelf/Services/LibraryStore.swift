@@ -35,6 +35,8 @@ final class LibraryStore {
     @ObservationIgnored private var indexTask: Task<Void, Never>?
     @ObservationIgnored private var activeIndexID: UUID?
     @ObservationIgnored private var reindexAfterCancel: Set<UUID> = []
+    /// Books paused so a code book could be indexed first; they go back in the queue.
+    @ObservationIgnored private var preempted: Set<UUID> = []
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     @ObservationIgnored private var lastProgressUpdate = Date.distantPast
@@ -354,6 +356,7 @@ final class LibraryStore {
             books[i].pageCount = file.pageCount
             books[i].indexedPages = 0
             books[i].ocrPages = 0
+            books[i].textPages = -1
             books[i].lastPage = min(books[i].lastPage, max(0, file.pageCount - 1))
             books[i].edition = retrieved
             books[i].sourceURL = sourceURL
@@ -691,7 +694,38 @@ final class LibraryStore {
     func enqueueIndexing(_ id: UUID) {
         guard activeIndexID != id, !queue.contains(id) else { return }
         queue.append(id)
+        prioritizeQueue()
         startNextIndexJob()
+    }
+
+    /// Code books are indexed first, then bulletins, then manufacturer instructions, so a
+    /// batch of downloaded manuals never keeps a code book you just added out of Search.
+    private func indexPriority(_ id: UUID) -> Int {
+        guard let book = book(id: id) else { return SearchTier.allCases.count }
+        return SearchTier.of(book.category).rawValue
+    }
+
+    private func prioritizeQueue() {
+        var arrival: [UUID: Int] = [:]
+        for (position, id) in queue.enumerated() where arrival[id] == nil {
+            arrival[id] = position
+        }
+        queue.sort { lhs, rhs in
+            let left = (indexPriority(lhs), arrival[lhs] ?? 0)
+            let right = (indexPriority(rhs), arrival[rhs] ?? 0)
+            return left < right
+        }
+        // A manual that's part-way through pauses (and resumes later) when a code book is waiting.
+        if let active = activeIndexID, let next = queue.first,
+           indexPriority(next) < indexPriority(active), !preempted.contains(active) {
+            preempted.insert(active)
+            indexTask?.cancel()
+        }
+    }
+
+    /// Code books (not manuals or bulletins) whose pages aren't all searchable yet.
+    var codeBooksStillIndexing: [Book] {
+        books.filter { SearchTier.of($0.category) == .codes && !$0.isIndexed }
     }
 
     func reindex(bookID: UUID) {
@@ -703,6 +737,7 @@ final class LibraryStore {
         }
         books[i].indexedPages = 0
         books[i].ocrPages = 0
+        books[i].textPages = -1
         saveNow()
         enqueueIndexing(bookID)
     }
@@ -779,8 +814,17 @@ final class LibraryStore {
             case .completed(let ocrPages):
                 books[i].indexedPages = books[i].pageCount
                 books[i].ocrPages = ocrPages
+                let index = self.index
+                Task { [weak self] in
+                    let textPages = await index.textPageCount(bookID: id)
+                    guard let self, let j = self.books.firstIndex(where: { $0.id == id }) else { return }
+                    self.books[j].textPages = textPages
+                    self.saveNow()
+                }
             case .cancelled:
-                break
+                if preempted.contains(id) && reindexAfterCancel.contains(id) == false {
+                    queue.append(id)
+                }
             case .failed(let message):
                 alertMessage = "Couldn't index “\(books[i].displayName)”: \(message)"
                 books[i].indexedPages = books[i].pageCount
@@ -788,6 +832,7 @@ final class LibraryStore {
             if reindexAfterCancel.remove(id) != nil {
                 books[i].indexedPages = 0
                 books[i].ocrPages = 0
+                books[i].textPages = -1
                 queue.insert(id, at: 0)
             }
         } else {
@@ -796,6 +841,8 @@ final class LibraryStore {
             Task { await index.deleteBook(id) }
         }
 
+        preempted.remove(id)
+        prioritizeQueue()
         saveNow()
         startNextIndexJob()
     }
@@ -809,12 +856,22 @@ final class LibraryStore {
             if books[i].indexedPages > 0 && stored == 0 {
                 books[i].indexedPages = 0
                 books[i].ocrPages = 0
+                books[i].textPages = -1
                 changed = true
             }
         }
         let known = Set(books.map(\.id))
         for id in counts.keys where !known.contains(id) {
             await index.deleteBook(id)
+        }
+        // Books indexed by older versions: find out whether they hold any searchable text.
+        let unknown = books.filter { $0.isIndexed && $0.textPages < 0 }.map(\.id)
+        for id in unknown {
+            let textPages = await index.textPageCount(bookID: id)
+            if let i = books.firstIndex(where: { $0.id == id }) {
+                books[i].textPages = textPages
+                changed = true
+            }
         }
         if changed { saveNow() }
         for book in books where !book.isIndexed {

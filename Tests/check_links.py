@@ -9,6 +9,7 @@ import json
 import pathlib
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -54,7 +55,7 @@ for doc in catalog:
 
 print("\n== Update sources and e-Laws pages (must load)")
 sources = set()
-for path in ["CodeShelf/Services/UpdatesStore.swift", "CodeShelf/Services/Ontario.swift"]:
+for path in ["CodeShelf/Services/UpdatesStore.swift", "CodeShelf/Services/Ontario.swift", "CodeShelf/Services/FuelPrices.swift"]:
     for url in re.findall(r'"(https://[^"\\]+)"', (ROOT / path).read_text()):
         if "google." not in url:
             sources.add(url)
@@ -64,6 +65,24 @@ for url in sorted(sources):
     print(f"  {'OK ' if ok else 'BAD'}  HTTP {status}  {url}")
     if not ok:
         problems.append(f"{url} -> HTTP {status} {kind[:80]}")
+
+print("\n== Fuel price data (Tools › Fuel Prices)")
+csv_url = "https://ontario.ca/v1/files/fuel-prices/fueltypesall.csv"
+status, kind, body = fetch(csv_url, limit=4096)
+header = body.decode("utf-8", "replace").splitlines()[0] if body else ""
+ok = status == 200 and header.startswith("Date,") and ",Fuel Type," in header and "Ontario Average" in header
+print(f"  {'OK ' if ok else 'BAD'}  HTTP {status}  header: {header[:120]}")
+if not ok:
+    problems.append(f"{csv_url} -> HTTP {status}, unexpected CSV header: {header[:120]}")
+for city, location in [("Kingston", 72), ("Thunder Bay", 23), ("Windsor", 19)]:
+    feed = f"https://www2.nrcan.gc.ca/eneene/sources/pripri/webfeed_e.cfm?priceYear={time.strftime('%Y')}&productID=7&locationID={location}"
+    status, kind, body = fetch(feed, limit=8192)
+    text = body.decode("utf-8", "replace")
+    price = re.search(r"<description>\$(\d+\.\d+)</description>\s*<pubDate>([^<]+)</pubDate>", text)
+    ok = status == 200 and "<item>" in text
+    print(f"  {'OK ' if ok else 'BAD'}  furnace oil {city}: HTTP {status} latest {price.groups() if price else 'none listed'}")
+    if not ok:
+        problems.append(f"NRCan furnace oil feed for {city} -> HTTP {status}")
 
 if problems:
     print(f"\n{len(problems)} link problem(s):")

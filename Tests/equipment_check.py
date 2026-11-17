@@ -18,7 +18,7 @@ def downloaded():
         books = json.loads((root / "library.json").read_text())["books"]
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         return {}
-    return {b.get("sourceURL", "").lower().rstrip("/"): b for b in books if b.get("category") == "manufacturer"}
+    return {b.get("sourceURL", "").lower().rstrip("/"): b for b in books if b.get("category") in ("manufacturer", "bulletin")}
 
 
 deadline = time.time() + 240

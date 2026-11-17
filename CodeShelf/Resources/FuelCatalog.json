@@ -4,7 +4,9 @@
   "equipment": [
     {
       "id": "gastite-di",
-      "types": ["CSST gas piping"],
+      "types": [
+        "CSST gas piping"
+      ],
       "manufacturer": "Gastite (Titeflex)",
       "title": "Gastite / FlashShield Design & Installation Guide",
       "models": "Gastite, FlashShield, FlashShield+",
@@ -12,7 +14,9 @@
     },
     {
       "id": "wardflex-di",
-      "types": ["CSST gas piping"],
+      "types": [
+        "CSST gas piping"
+      ],
       "manufacturer": "Ward Manufacturing (ASC Engineered Solutions)",
       "title": "WARDFlex / WARDFlex MAX Design & Installation Guide",
       "models": "WARDFlex, WARDFlex MAX",
@@ -20,7 +24,9 @@
     },
     {
       "id": "tracpipe-di",
-      "types": ["CSST gas piping"],
+      "types": [
+        "CSST gas piping"
+      ],
       "manufacturer": "OmegaFlex",
       "title": "TracPipe CounterStrike Design Guide & Installation Instructions (Canada)",
       "models": "TracPipe, CounterStrike",
@@ -28,7 +34,9 @@
     },
     {
       "id": "ipex-636",
-      "types": ["ULC S636 venting"],
+      "types": [
+        "ULC S636 venting"
+      ],
       "manufacturer": "IPEX",
       "title": "System 636 PVC & CPVC Flue Gas Venting Installation Guide",
       "models": "System 636 PVC (Class IIA), CPVC (Class IIB)",
@@ -36,7 +44,9 @@
     },
     {
       "id": "duravent-polypro",
-      "types": ["ULC S636 venting"],
+      "types": [
+        "ULC S636 venting"
+      ],
       "manufacturer": "DuraVent",
       "title": "PolyPro Polypropylene Venting Installation Instructions",
       "models": "PolyPro single wall, flex, concentric",
@@ -44,7 +54,9 @@
     },
     {
       "id": "centrotherm-innoflue",
-      "types": ["ULC S636 venting"],
+      "types": [
+        "ULC S636 venting"
+      ],
       "manufacturer": "Centrotherm",
       "title": "InnoFlue Polypropylene Venting Installation Guide",
       "models": "InnoFlue SW, Flex, concentric",
@@ -52,7 +64,11 @@
     },
     {
       "id": "rego-l545",
-      "types": ["Propane regulator", "Relief valve", "Propane tank / cylinder"],
+      "types": [
+        "Propane regulator",
+        "Relief valve",
+        "Propane tank / cylinder"
+      ],
       "manufacturer": "RegO",
       "title": "LP-Gas Serviceman's Manual (L-545)",
       "models": "Regulators, pressure relief valves, ASME containers, leak testing",
@@ -60,7 +76,9 @@
     },
     {
       "id": "fisher-r600",
-      "types": ["Propane regulator"],
+      "types": [
+        "Propane regulator"
+      ],
       "manufacturer": "Fisher (Emerson)",
       "title": "R600 & HSRL Series LP-Gas Regulators Instruction Manual",
       "models": "R622, R632, R642, R652, HSRL",
@@ -68,7 +86,9 @@
     },
     {
       "id": "fisher-r122h",
-      "types": ["Propane regulator"],
+      "types": [
+        "Propane regulator"
+      ],
       "manufacturer": "Fisher (Emerson)",
       "title": "R122H, R222H, R222, R232A & R232E Series Instruction Manual",
       "models": "R122H, R222H, R222, R232A, R232E",
@@ -76,7 +96,9 @@
     },
     {
       "id": "fisher-912",
-      "types": ["Propane regulator"],
+      "types": [
+        "Propane regulator"
+      ],
       "manufacturer": "Fisher (Emerson)",
       "title": "912H, 912N, Y200H, Y200N & R922N LP-Gas Regulators Instruction Manual",
       "models": "912H, 912N, Y200H, Y200N, R922N",
@@ -84,7 +106,9 @@
     },
     {
       "id": "mec-regulators",
-      "types": ["Propane regulator"],
+      "types": [
+        "Propane regulator"
+      ],
       "manufacturer": "Marshall Excelsior (MEC)",
       "title": "MEGR Regulator Installation Instructions",
       "models": "MEGR series",
@@ -92,7 +116,9 @@
     },
     {
       "id": "fisher-h100",
-      "types": ["Relief valve"],
+      "types": [
+        "Relief valve"
+      ],
       "manufacturer": "Fisher (Emerson)",
       "title": "H100 Series External Relief Valves Instruction Manual",
       "models": "H100 series",
@@ -100,7 +126,9 @@
     },
     {
       "id": "fisher-h-series",
-      "types": ["Relief valve"],
+      "types": [
+        "Relief valve"
+      ],
       "manufacturer": "Fisher (Emerson)",
       "title": "\"H\" Series Relief Valves Instruction Manual",
       "models": "H series internal and external relief valves",
@@ -108,7 +136,9 @@
     },
     {
       "id": "mec-relief",
-      "types": ["Relief valve"],
+      "types": [
+        "Relief valve"
+      ],
       "manufacturer": "Marshall Excelsior (MEC)",
       "title": "Pressure Relief Valve Instructions",
       "models": "MEC relief valves",
@@ -116,19 +146,74 @@
     },
     {
       "id": "manchester-asme",
-      "types": ["Propane tank / cylinder"],
+      "types": [
+        "Propane tank / cylinder"
+      ],
       "manufacturer": "Manchester Tank (McWane)",
       "title": "Aboveground & Underground Horizontal ASME Domestic Propane Tanks",
       "models": "ASME domestic propane tanks",
       "url": "https://mcwane.com/upl/downloads/library/aboveground-underground-horizontal-asme-domestic-propane-tanks.pdf"
     },
     {
+      "id": "worthington-ag-ug",
+      "types": [
+        "Propane tank / cylinder"
+      ],
+      "manufacturer": "Worthington",
+      "title": "Aboveground / Underground Horizontal ASME LPG Tanks — Specifications",
+      "models": "120–1000 WG horizontal ASME tanks, aboveground or underground",
+      "url": "https://buildingproducts.worthingtonenterprises.com/docs/default-source/default-document-library/aboveground-underground-horizontal.pdf"
+    },
+    {
+      "id": "worthington-ag",
+      "types": [
+        "Propane tank / cylinder"
+      ],
+      "manufacturer": "Worthington",
+      "title": "Aboveground Horizontal ASME LPG Tanks — Specifications",
+      "models": "Aboveground horizontal ASME tanks (500 and 1000 WG CRN-registered for Canada)",
+      "url": "https://buildingproducts.worthingtonenterprises.com/docs/default-source/default-document-library/aboveground-horizontal.pdf"
+    },
+    {
       "id": "worthington-cylinders",
-      "types": ["Propane tank / cylinder"],
+      "types": [
+        "Propane tank / cylinder"
+      ],
       "manufacturer": "Worthington",
       "title": "Propane Cylinder Safety & Installation Information",
       "models": "TC/DOT propane cylinders",
       "search": "Worthington propane cylinder installation and safety instructions PDF"
+    },
+    {
+      "id": "trinity-asme",
+      "types": [
+        "Propane tank / cylinder"
+      ],
+      "manufacturer": "Trinity Containers (Arcosa)",
+      "title": "Trinity ASME Propane Tank Installation Instructions",
+      "models": "Trinity aboveground and underground ASME domestic tanks",
+      "search": "Trinity Containers ASME propane tank installation instructions underground aboveground PDF"
+    },
+    {
+      "id": "propar-tanks",
+      "types": [
+        "Propane tank / cylinder"
+      ],
+      "manufacturer": "Pro-Par",
+      "title": "Pro-Par Propane Tank Installation Instructions",
+      "models": "Pro-Par propane tanks",
+      "search": "Pro-Par propane tank installation instructions PDF"
+    },
+    {
+      "id": "tssa-fs-258-21",
+      "types": [
+        "Propane tank / cylinder"
+      ],
+      "manufacturer": "TSSA",
+      "category": "bulletin",
+      "title": "FS-258-21 Approval of Underground Propane Tank Installations",
+      "models": "Underground propane tanks — CSA B149.2 clause 7.8.1 approval",
+      "url": "https://www.tssa.org/sites/default/files/2023-10/FS-Approval-of-Underground-Propane-Tank-Installations-Advisory-258-2021.pdf"
     }
   ]
 }

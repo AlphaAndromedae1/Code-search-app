@@ -23,26 +23,21 @@ struct SearchResultsList: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            ForEach(model.groups) { group in
-                if let book = store.book(id: group.bookID) {
-                    Section {
-                        ForEach(visibleHits(for: group)) { hit in
-                            row(for: hit)
-                        }
-                        if group.hits.count > previewCount && !expanded.contains(group.bookID) {
-                            Button("Show all \(group.hits.count) pages") {
-                                expanded.insert(group.bookID)
-                            }
-                            .font(.callout)
-                        }
-                    } header: {
-                        HStack {
-                            Label(book.displayName, systemImage: book.category.symbol)
-                            Spacer()
-                            Text("\(group.hits.count)")
-                                .monospacedDigit()
-                        }
+            ForEach(model.tiers) { tier in
+                Section {
+                } header: {
+                    HStack(alignment: .firstTextBaseline) {
+                        Label(tier.tier.label, systemImage: tier.tier.symbol)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text("\(tier.pageCount) page\(tier.pageCount == 1 ? "" : "s")")
+                            .font(.caption)
                     }
+                    .textCase(nil)
+                }
+                ForEach(tier.groups) { group in
+                    bookSection(group)
                 }
             }
         }
@@ -52,12 +47,36 @@ struct SearchResultsList: View {
         }
     }
 
+    @ViewBuilder
+    private func bookSection(_ group: BookHits) -> some View {
+        if let book = store.book(id: group.bookID) {
+            Section {
+                ForEach(visibleHits(for: group)) { hit in
+                    row(for: hit)
+                }
+                if group.hits.count > previewCount && !expanded.contains(group.bookID) {
+                    Button("Show all \(group.hits.count) pages") {
+                        expanded.insert(group.bookID)
+                    }
+                    .font(.callout)
+                }
+            } header: {
+                HStack {
+                    Label(book.displayName, systemImage: book.category.symbol)
+                    Spacer()
+                    Text("\(group.hits.count)")
+                        .monospacedDigit()
+                }
+            }
+        }
+    }
+
     private var summary: String {
         let pages = model.totalHits
         let books = model.groups.count
-        var text = "\(pages) matching page\(pages == 1 ? "" : "s") in \(books) book\(books == 1 ? "" : "s"), best matches first."
+        var text = "\(pages) matching page\(pages == 1 ? "" : "s") in \(books) book\(books == 1 ? "" : "s"). Code books first, best matches first."
         if model.hitLimitReached {
-            text += " Showing the top \(SearchModel.limit) — add words to narrow it down."
+            text += " Showing the top matches — add words to narrow it down."
         }
         return text
     }
