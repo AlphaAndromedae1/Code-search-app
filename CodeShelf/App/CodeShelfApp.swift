@@ -64,6 +64,15 @@ struct CodeShelfApp: App {
                 "rows": rows.map { ["name": $0.name, "cents": $0.cents ?? -1, "per": $0.per, "date": $0.date, "note": $0.note ?? ""] as [String: Any] },
                 "naturalGas": (prices.snapshot?.naturalGas ?? []).map { "\($0.utility): \($0.centsPerCubicMetre)" },
                 "naturalGasEffective": prices.snapshot?.naturalGasEffective ?? "",
+                "directNRCan": await { () async -> String in
+                    let url = URL(string: "https://www2.nrcan.gc.ca/eneene/sources/pripri/webfeed_e.cfm?priceYear=\(Calendar(identifier: .gregorian).component(.year, from: Date()))&productID=7&locationID=72")!
+                    let result = await DirectHTTPS.get(url)
+                    if let data = result.data, let text = String(data: data, encoding: .utf8),
+                       let reading = FuelPriceSources.parseNRCanFeed(text) {
+                        return "Kingston \(reading.dollars) $/L (\(data.count) bytes)"
+                    }
+                    return "failed: \(result.problem ?? "no price in \(result.data?.count ?? 0) bytes")"
+                }(),
                 "webFallback": await NRCanWebFallback.readings(
                     cities: FuelPriceSources.nrcanCities,
                     year: Calendar(identifier: .gregorian).component(.year, from: Date())

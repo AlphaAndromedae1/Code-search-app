@@ -337,6 +337,14 @@ final class FuelPriceStore {
     }
 }
 
+/// Servers that only answered through the direct connection this session.
+private actor DirectHosts {
+    static let shared = DirectHosts()
+    private var hosts: Set<String> = []
+    func contains(_ host: String) -> Bool { hosts.contains(host) }
+    func insert(_ host: String) { hosts.insert(host) }
+}
+
 /// Where the prices come from, and how they're read. Runs off the main thread.
 enum FuelPriceSources {
     static let ontarioCSV = URL(string: "https://ontario.ca/v1/files/fuel-prices/fueltypesall.csv")!
@@ -396,10 +404,26 @@ enum FuelPriceSources {
         if request.value(forHTTPHeaderField: "Accept") == nil {
             request.setValue("text/csv, application/rss+xml, application/json, text/html, */*", forHTTPHeaderField: "Accept")
         }
+        let isGET = (request.httpMethod ?? "GET") == "GET"
+        // A server that already needed the direct connection gets it straight away.
+        if isGET, let url = request.url, let host = url.host, await DirectHosts.shared.contains(host) {
+            let direct = await DirectHTTPS.get(url)
+            if let data = direct.data { return (data, nil) }
+        }
         let first = await attempt(request, session: .shared)
         guard first.data == nil, first.retry else { return (first.data, first.problem) }
         let second = await attempt(request, session: tls12Session)
         if second.data != nil { return (second.data, nil) }
+        // iOS 27 refuses some government TLS 1.2 servers inside apps (App Transport Security) while
+        // Safari opens them: connect directly with Network.framework instead.
+        if isGET, let url = request.url {
+            let direct = await DirectHTTPS.get(url)
+            if let data = direct.data {
+                if let host = url.host { await DirectHosts.shared.insert(host) }
+                return (data, nil)
+            }
+            return (nil, "\(first.problem ?? "failed"); direct connection: \(direct.problem ?? "failed")")
+        }
         return (nil, "\(first.problem ?? "failed"); over TLS 1.2: \(second.problem ?? "failed")")
     }
 

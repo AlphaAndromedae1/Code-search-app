@@ -129,6 +129,15 @@ for host in ("www2.nrcan.gc.ca", "www2.nrcan-rncan.gc.ca"):
                     print(f"  {host} [{label}]: {tls.version()} {name} ({fs}), certificate from {issuer}")
         except Exception as error:
             print(f"  {host} [{label}]: FAILED {error}")
+    # iOS 27 refuses TLS 1.2 without the extended master secret extension inside apps (Apple support 126655).
+    try:
+        import subprocess
+        out = subprocess.run(["openssl", "s_client", "-connect", f"{host}:443", "-servername", host, "-tls1_2"],
+                             input="", capture_output=True, text=True, timeout=30).stdout
+        ems = next((line.strip() for line in out.splitlines() if "Extended master secret" in line), "not reported")
+        print(f"  {host}: {ems}")
+    except Exception as error:
+        print(f"  {host}: openssl check failed: {error}")
 
 if problems:
     print(f"\n{len(problems)} link problem(s):")
