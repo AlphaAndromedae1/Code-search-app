@@ -136,6 +136,16 @@ for host in ("www2.nrcan.gc.ca", "www2.nrcan-rncan.gc.ca"):
                              input="", capture_output=True, text=True, timeout=30).stdout
         ems = next((line.strip() for line in out.splitlines() if "Extended master secret" in line), "not reported")
         print(f"  {host}: {ems}")
+        # The certificate chain (iOS no longer trusts newer Entrust certificates; the app pins NRCan's issuer).
+        chain = subprocess.run(["openssl", "s_client", "-connect", f"{host}:443", "-servername", host, "-showcerts"],
+                               input="", capture_output=True, text=True, timeout=30).stdout
+        pems = re.findall(r"-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----", chain, re.S)
+        for number, pem in enumerate(pems):
+            info = subprocess.run(["openssl", "x509", "-noout", "-subject", "-issuer", "-dates", "-fingerprint", "-sha256"],
+                                  input=pem, capture_output=True, text=True).stdout.strip().replace("\n", " | ")
+            print(f"  {host} chain[{number}]: {info}")
+            if number > 0 and host == "www2.nrcan.gc.ca":
+                print(pem)
     except Exception as error:
         print(f"  {host}: openssl check failed: {error}")
 
