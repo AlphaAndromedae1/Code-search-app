@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import SwiftUI
 
 /// Weekly retail fuel prices in Ontario (cents per litre, taxes included).
@@ -39,7 +40,18 @@ struct FuelPriceSnapshot: Codable, Sendable {
     var heatingMonthly: [CityReading]? = nil
     /// Why furnace oil prices couldn't be downloaded, if they couldn't.
     var furnaceProblem: String? = nil
+    /// Natural gas supply charges by utility / rate zone (Ontario Energy Board), ¢/m³.
+    var naturalGas: [GasRate]? = nil
+    /// "October 1, 2026": when those rates took effect.
+    var naturalGasEffective: String? = nil
+    var naturalGasProblem: String? = nil
     var fetched: Date
+
+    struct GasRate: Codable, Sendable, Identifiable, Hashable {
+        var utility: String
+        var centsPerCubicMetre: Double
+        var id: String { utility }
+    }
 }
 
 struct FuelPriceRow: Identifiable, Sendable {
@@ -52,6 +64,8 @@ struct FuelPriceRow: Identifiable, Sendable {
     let source: String
     let note: String?
     let isEstimate: Bool
+    /// "L" (cents per litre) or "m³" (cents per cubic metre, natural gas).
+    var per: String = "L"
 }
 
 @MainActor
@@ -64,6 +78,8 @@ final class FuelPriceStore {
     /// Ontario's clear diesel fuel tax (9.0¢/L) plus 13% HST on it; coloured fuel doesn't pay it.
     static let defaultDyedDiscount = 10.2
     static let averageMarket = "Ontario Average/Moyenne provinciale"
+    static let gasUtilityKey = "naturalGasUtility"
+    static let defaultGasUtility = "Enbridge Gas Inc."
 
     private(set) var snapshot: FuelPriceSnapshot?
     private(set) var isLoading = false
@@ -82,7 +98,8 @@ final class FuelPriceStore {
     var isStale: Bool {
         guard let snapshot else { return true }
         // Saved before furnace oil loaded (or by an older version): try again right away.
-        if snapshot.heatingMonthly == nil || (snapshot.furnaceOil.isEmpty && (snapshot.heatingMonthly ?? []).isEmpty) {
+        if snapshot.heatingMonthly == nil || (snapshot.furnaceOil.isEmpty && (snapshot.heatingMonthly ?? []).isEmpty)
+            || (snapshot.naturalGas ?? []).isEmpty {
             return true
         }
         return Date().timeIntervalSince(snapshot.fetched) > 6 * 3600
@@ -101,7 +118,8 @@ final class FuelPriceStore {
         async let ontario = FuelPriceSources.loadOntario()
         async let weekly = FuelPriceSources.loadFurnaceOil()
         async let monthly = FuelPriceSources.loadStatCanHeatingFuel()
-        let (surveyResult, oil, heating) = await (ontario, weekly, monthly)
+        async let gas = FuelPriceSources.loadOEBNaturalGas()
+        let (surveyResult, oil, heating, gasRates) = await (ontario, weekly, monthly, gas)
 
         guard let survey = surveyResult.value else {
             errorMessage = "Couldn't download Ontario's fuel price survey (\(surveyResult.problem ?? "no data")). Showing the last prices saved."
@@ -116,6 +134,9 @@ final class FuelPriceStore {
             furnaceOil: oil.readings.isEmpty ? (snapshot?.furnaceOil ?? []) : oil.readings,
             heatingMonthly: heating.readings.isEmpty ? snapshot?.heatingMonthly : heating.readings,
             furnaceProblem: problems.isEmpty ? nil : problems.joined(separator: "; "),
+            naturalGas: gasRates.value?.rates ?? snapshot?.naturalGas,
+            naturalGasEffective: gasRates.value?.effective ?? snapshot?.naturalGasEffective,
+            naturalGasProblem: gasRates.problem,
             fetched: Date()
         )
         snapshot = fresh
@@ -151,6 +172,43 @@ final class FuelPriceStore {
         return FuelPriceSources.nrcanCities.first { $0.name == name }?.id
     }
 
+    /// The natural gas utility / rate zone picked on the Fuel Prices screen.
+    var gasUtility: String {
+        UserDefaults.standard.string(forKey: Self.gasUtilityKey) ?? Self.defaultGasUtility
+    }
+
+    private func naturalGasRow(utility: String) -> FuelPriceRow {
+        let rates = snapshot?.naturalGas ?? []
+        let rate = rates.first { $0.utility == utility } ?? rates.first { $0.utility == Self.defaultGasUtility } ?? rates.first
+        guard let rate else {
+            return FuelPriceRow(
+                id: "naturalgas", name: "Natural Gas", detail: "Gas supply charge",
+                cents: nil, change: nil, date: "", source: "Ontario Energy Board",
+                note: "Natural gas rates couldn't be downloaded\(snapshot?.naturalGasProblem.map { ": \($0)" } ?? "."). Pull down to try again.",
+                isEstimate: false, per: "m³"
+            )
+        }
+        return FuelPriceRow(
+            id: "naturalgas", name: "Natural Gas", detail: "Gas supply charge, \(Self.displayName(ofUtility: rate.utility))",
+            cents: rate.centsPerCubicMetre, change: nil, date: snapshot?.naturalGasEffective ?? "",
+            source: "Ontario Energy Board",
+            note: "Supply (commodity) charge set by the OEB each quarter. Delivery, transportation (where not included) and the monthly customer charge are billed on top.",
+            isEstimate: false, per: "m³"
+        )
+    }
+
+    static func displayName(ofUtility name: String) -> String {
+        switch name {
+        case "Enbridge Gas Inc.": return "Enbridge Gas (EGD rate zone)"
+        default:
+            return name
+                .replacingOccurrences(of: "Enbridge Gas Inc. - ", with: "Enbridge Gas, ")
+                .replacingOccurrences(of: " Rate Zone", with: " zone")
+                .replacingOccurrences(of: "Natural Gas Limited Partnership", with: "Natural Gas")
+                .trimmingCharacters(in: CharacterSet(charactersIn: "* "))
+        }
+    }
+
     func rows(market: String, dyedDiscount: Double) -> [FuelPriceRow] {
         guard let snapshot else { return [] }
         let column = snapshot.markets.firstIndex(of: market) ?? snapshot.markets.firstIndex(of: Self.averageMarket) ?? 0
@@ -184,6 +242,7 @@ final class FuelPriceStore {
             rows.append(row)
         }
         rows.append(furnaceOilRow(market: market, marketName: marketName))
+        rows.append(naturalGasRow(utility: gasUtility))
         if let row = surveyRow(id: "regular", fuel: "Regular Unleaded Gasoline", name: "Gasoline — Regular", detail: "Regular unleaded") {
             rows.append(row)
         }
@@ -284,6 +343,7 @@ enum FuelPriceSources {
     static let nrcanPage = URL(string: "https://www2.nrcan.gc.ca/eneene/sources/pripri/prices_bycity_e.cfm?productID=7&locationID=66&frequency=W")!
     static let statCanPage = URL(string: "https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1810000101")!
     static let statCanAPI = URL(string: "https://www150.statcan.gc.ca/t1/wds/rest/getDataFromCubePidCoordAndLatestNPeriods")!
+    static let oebRates = URL(string: "https://www.oeb.ca/consumer-information-and-protection/natural-gas-rates")!
 
     /// NRCan city IDs in Ontario that report furnace oil (plus the big cities, in case they resume).
     static let nrcanCities: [(name: String, id: Int)] = [
@@ -316,23 +376,49 @@ enum FuelPriceSources {
         var problem: String?
     }
 
+    /// A session limited to TLS 1.2. Some government servers and firewalls reject the larger TLS 1.3
+    /// handshake newer iOS versions send (with post-quantum key exchange): the secure connection fails
+    /// (-1200) or the firewall answers 403. A plain TLS 1.2 handshake gets through.
+    private static let tls12Session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.tlsMaximumSupportedProtocolVersion = .TLSv12
+        configuration.httpAdditionalHeaders = ["Accept-Language": "en-CA,en;q=0.9"]
+        return URLSession(configuration: configuration)
+    }()
+
     /// Downloads a URL; on failure says why (HTTP status or the system's error, e.g. a certificate problem).
+    /// A refused secure connection or a 403 is retried once over TLS 1.2.
     static func fetch(_ request: URLRequest) async -> (data: Data?, problem: String?) {
         var request = request
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.timeoutInterval = 45
+        request.timeoutInterval = 30
         if request.value(forHTTPHeaderField: "Accept") == nil {
-            request.setValue("text/csv, application/rss+xml, application/json, */*", forHTTPHeaderField: "Accept")
+            request.setValue("text/csv, application/rss+xml, application/json, text/html, */*", forHTTPHeaderField: "Accept")
         }
+        let first = await attempt(request, session: .shared)
+        guard first.data == nil, first.retry else { return (first.data, first.problem) }
+        let second = await attempt(request, session: tls12Session)
+        if second.data != nil { return (second.data, nil) }
+        return (nil, "\(first.problem ?? "failed"); over TLS 1.2: \(second.problem ?? "failed")")
+    }
+
+    private static func attempt(_ request: URLRequest, session: URLSession) async -> (data: Data?, problem: String?, retry: Bool) {
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse else { return (nil, "no response") }
-            guard (200..<300).contains(http.statusCode) else { return (nil, "HTTP \(http.statusCode)") }
-            return (data, nil)
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else { return (nil, "no response", false) }
+            guard (200..<300).contains(http.statusCode) else {
+                return (nil, "HTTP \(http.statusCode)", http.statusCode == 403 || http.statusCode == 406)
+            }
+            return (data, nil, false)
         } catch let error as URLError {
-            return (nil, "\(error.localizedDescription) (\(error.code.rawValue))")
+            let tlsFailure: Set<URLError.Code> = [
+                .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate,
+                .serverCertificateNotYetValid, .serverCertificateHasUnknownRoot, .clientCertificateRejected,
+                .networkConnectionLost,
+            ]
+            return (nil, "\(error.localizedDescription) (\(error.code.rawValue))", tlsFailure.contains(error.code))
         } catch {
-            return (nil, error.localizedDescription)
+            return (nil, error.localizedDescription, false)
         }
     }
 
@@ -470,9 +556,63 @@ enum FuelPriceSources {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.httpBody = Data(("[" + body.joined(separator: ",") + "]").utf8)
         let result = await fetch(request)
-        guard let data = result.data else { return Readings(readings: [], problem: result.problem) }
+        guard let data = result.data else {
+            // Statistics Canada sometimes puts a "verify your browser" check (Cloudflare) in front of its API.
+            let blocked = result.problem?.contains("HTTP 403") == true
+            return Readings(readings: [], problem: blocked ? "its site is showing a browser security check to apps (HTTP 403)" : result.problem)
+        }
         let readings = parseStatCan(data)
         return Readings(readings: readings, problem: readings.isEmpty ? "unexpected reply" : nil)
+    }
+
+    struct GasRates: Sendable {
+        var rates: [FuelPriceSnapshot.GasRate]
+        var effective: String
+    }
+
+    /// The OEB's "Current gas rates for supply (October 1, 2026)" table: utility and gas supply charge (¢/m³).
+    static func loadOEBNaturalGas() async -> Loaded<GasRates> {
+        let result = await fetch(oebRates)
+        guard let data = result.data else { return Loaded(value: nil, problem: result.problem) }
+        guard let parsed = parseOEB(String(decoding: data, as: UTF8.self)) else {
+            return Loaded(value: nil, problem: "the OEB page's layout changed")
+        }
+        return Loaded(value: parsed, problem: nil)
+    }
+
+    static func parseOEB(_ html: String) -> GasRates? {
+        // The heading carries the date: "Current gas rates for supply (October 1, 2026)". The same words
+        // without the date also appear earlier, in the page's table of contents.
+        guard let heading = html.range(of: "Current gas rates for supply (") ?? html.range(of: "Current gas rates for supply") else { return nil }
+        let afterHeading = html[heading.upperBound...]
+        var effective = ""
+        if html[heading].hasSuffix("("), let close = afterHeading.firstIndex(of: ")") {
+            effective = String(afterHeading[..<close]).trimmingCharacters(in: .whitespaces)
+        }
+        guard let tableStart = afterHeading.range(of: "<table"), let tableEnd = afterHeading.range(of: "</table>", range: tableStart.upperBound..<afterHeading.endIndex) else { return nil }
+        let table = String(afterHeading[tableStart.lowerBound..<tableEnd.upperBound])
+        var rates: [FuelPriceSnapshot.GasRate] = []
+        for row in table.components(separatedBy: "<tr").dropFirst() {
+            let cells = row.components(separatedBy: "<td").dropFirst().map(plainText)
+            guard cells.count >= 2,
+                  let match = cells[1].range(of: #"[0-9]+(\.[0-9]+)?"#, options: .regularExpression),
+                  let value = Double(cells[1][match]), value > 0, value < 200
+            else { continue }
+            let name = cells[0].trimmingCharacters(in: CharacterSet(charactersIn: "* ").union(.whitespacesAndNewlines))
+            rates.append(FuelPriceSnapshot.GasRate(utility: name, centsPerCubicMetre: value))
+        }
+        return rates.isEmpty ? nil : GasRates(rates: rates, effective: effective)
+    }
+
+    /// Text of an HTML fragment: tags removed, common entities decoded, spaces collapsed.
+    private static func plainText(_ html: String) -> String {
+        var text = html
+        if let close = text.firstIndex(of: ">") { text = String(text[text.index(after: close)...]) }
+        text = text.replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
+        for (entity, value) in [("&nbsp;", " "), ("&amp;", "&"), ("&#039;", "'"), ("&rsquo;", "’")] {
+            text = text.replacingOccurrences(of: entity, with: value)
+        }
+        return text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.joined(separator: " ")
     }
 
     static func parseStatCan(_ data: Data) -> [FuelPriceSnapshot.CityReading] {

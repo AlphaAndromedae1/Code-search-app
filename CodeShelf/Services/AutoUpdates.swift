@@ -45,8 +45,27 @@ enum BackgroundRefresh {
 
 /// Fetches a page's HTML and lists its links, without a web view, so it also works in the background.
 enum HTMLLinkFetcher {
+    /// Downloads several pages at once, `concurrent` at a time. Keyed by the caller's id.
+    static func links(for pages: [(id: String, url: URL)], concurrent: Int) async -> [String: [PageLink]] {
+        await withTaskGroup(of: (String, [PageLink]).self) { group in
+            var results: [String: [PageLink]] = [:]
+            var waiting = pages.makeIterator()
+            for _ in 0..<min(concurrent, pages.count) {
+                guard let page = waiting.next() else { break }
+                group.addTask { (page.id, await links(at: page.url)) }
+            }
+            while let result = await group.next() {
+                results[result.0] = result.1
+                if let page = waiting.next() {
+                    group.addTask { (page.id, await links(at: page.url)) }
+                }
+            }
+            return results
+        }
+    }
+
     static func links(at url: URL) async -> [PageLink] {
-        let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
+        let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
         guard let result = try? await URLSession.shared.data(for: request),
               let http = result.1 as? HTTPURLResponse,
               (200..<300).contains(http.statusCode)

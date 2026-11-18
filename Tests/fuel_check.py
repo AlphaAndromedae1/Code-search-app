@@ -27,13 +27,15 @@ print(f"Furnace oil cities: {', '.join(probe['furnaceOilCities']) or 'none'}")
 print(f"Heating fuel, monthly (Statistics Canada): {', '.join(probe.get('heatingMonthly', [])) or 'none'}")
 print(f"Furnace oil problems: {probe.get('furnaceProblem') or 'none'}")
 ok = True
+print(f"Natural gas ({probe.get('naturalGasEffective') or 'no date'}): {'; '.join(probe.get('naturalGas', [])) or 'none'}")
 for row in probe["rows"]:
     cents = row["cents"]
-    good = 40 <= cents <= 500
+    per = row.get("per", "L")
+    good = (1 <= cents <= 100) if per == "m³" else (40 <= cents <= 500)
     ok = ok and good
-    print(f"  {'OK  ' if good else 'BAD '} {row['name']:<20} {cents:7.1f} ¢/L  {row['date']}  {row['note'][:90]}")
+    print(f"  {'OK  ' if good else 'BAD '} {row['name']:<20} {cents:8.2f} ¢/{per}  {row['date']}  {row['note'][:90]}")
 names = {row["name"] for row in probe["rows"]}
-wanted = {"Propane", "Furnace Oil", "Gasoline — Regular", "Gasoline — Premium", "Diesel", "Dyed Diesel"}
+wanted = {"Propane", "Natural Gas", "Furnace Oil", "Gasoline — Regular", "Gasoline — Premium", "Diesel", "Dyed Diesel"}
 missing = wanted - names
 if missing:
     print("Missing:", ", ".join(sorted(missing)))

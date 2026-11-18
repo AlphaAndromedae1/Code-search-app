@@ -13,6 +13,8 @@ enum ToolRoute: Hashable {
     case pipeSizing
     case csstSizing
     case fuelPrices
+    case gasConversion
+    case tdg
     case compare
 }
 

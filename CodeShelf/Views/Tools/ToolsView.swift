@@ -23,12 +23,28 @@ struct ToolsView: View {
                             symbol: "arrow.triangle.branch"
                         )
                     }
+                    NavigationLink(value: ToolRoute.gasConversion) {
+                        ToolRow(
+                            title: "Natural Gas ⇄ Propane",
+                            subtitle: "Properties side by side, energy equivalents, orifice drill conversions",
+                            symbol: "arrow.left.arrow.right"
+                        )
+                    }
+                }
+                Section("Safety") {
+                    NavigationLink(value: ToolRoute.tdg) {
+                        ToolRow(
+                            title: "TDG – Fuels",
+                            subtitle: "UN numbers (UN1075, UN1978…), shipping names, classes and ERG guides",
+                            symbol: "exclamationmark.triangle"
+                        )
+                    }
                 }
                 Section("Prices") {
                     NavigationLink(value: ToolRoute.fuelPrices) {
                         ToolRow(
                             title: "Fuel Prices",
-                            subtitle: "Propane, furnace oil, gasoline, diesel and dyed diesel in Ontario (CAD)",
+                            subtitle: "Propane, natural gas, furnace oil, gasoline, diesel and dyed diesel in Ontario (CAD)",
                             symbol: "fuelpump"
                         )
                     }
@@ -49,6 +65,8 @@ struct ToolsView: View {
                 case .pipeSizing: PipeSizingView()
                 case .csstSizing: CSSTSizingView()
                 case .fuelPrices: FuelPricesView()
+                case .gasConversion: GasConversionView()
+                case .tdg: TDGView()
                 case .compare: CompareView()
                 }
             }

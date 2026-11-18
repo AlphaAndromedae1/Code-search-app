@@ -6,6 +6,8 @@
 Usage: python3 Tests/check_links.py
 """
 import json
+import socket
+import ssl
 import pathlib
 import re
 import sys
@@ -85,6 +87,16 @@ for city, location in [("Kingston", 72), ("Thunder Bay", 23), ("Windsor", 19)]:
     if not ok:
         problems.append(f"NRCan furnace oil feed for {city} -> HTTP {status}")
 
+oeb = "https://www.oeb.ca/consumer-information-and-protection/natural-gas-rates"
+status, kind, body = fetch(oeb, limit=400000)
+page = body.decode("utf-8", "replace")
+heading = re.search(r"Current gas rates for supply \(([^)]+)\)", page)
+rates = re.findall(r"<td>([^<]+)</td>\s*<td>.*?([0-9]+\.[0-9]+)\s*(?:</span>)?\s*¢/m", page)
+ok = status == 200 and heading is not None and len(rates) >= 4
+print(f"  {'OK ' if ok else 'BAD'}  natural gas, OEB ({heading.group(1) if heading else 'no date'}): {[(n.strip(), v) for n, v in rates][:6]}")
+if not ok:
+    problems.append("Ontario Energy Board natural gas rates table not found")
+
 statcan = "https://www150.statcan.gc.ca/t1/wds/rest/getDataFromCubePidCoordAndLatestNPeriods"
 body = json.dumps([{"productId": 18100001, "coordinate": f"{geo}.7.0.0.0.0.0.0.0.0", "latestN": 1} for geo in (9, 8, 10)]).encode()
 request = urllib.request.Request(statcan, data=body, headers={**HEADERS, "Content-Type": "application/json", "Accept": "application/json"})
@@ -98,7 +110,24 @@ except Exception as error:  # HTTP errors, JSON changes
     ok = False
     print(f"  BAD  heating fuel, Statistics Canada: {error}")
 if not ok:
-    problems.append("Statistics Canada heating fuel prices (table 18-10-0001-01) didn't return Toronto, Ottawa and Thunder Bay")
+    # A backup source; Statistics Canada sometimes puts a browser security check in front of its API.
+    print("  WARN Statistics Canada isn't answering apps right now (furnace oil falls back to NRCan only)")
+
+print("\n== TLS offered by the furnace oil servers (iOS needs TLS 1.2+; forward secrecy unless excepted)")
+for host in ("www2.nrcan.gc.ca", "www2.nrcan-rncan.gc.ca"):
+    for label, maximum in (("default", None), ("TLS 1.2 only", ssl.TLSVersion.TLSv1_2)):
+        context = ssl.create_default_context()
+        if maximum:
+            context.maximum_version = maximum
+        try:
+            with socket.create_connection((host, 443), timeout=20) as raw:
+                with context.wrap_socket(raw, server_hostname=host) as tls:
+                    name, version, bits = tls.cipher()
+                    issuer = dict(x[0] for x in tls.getpeercert()["issuer"]).get("organizationName", "?")
+                    fs = "forward secrecy" if ("ECDHE" in name or "DHE" in name or version == "TLSv1.3") else "NO forward secrecy"
+                    print(f"  {host} [{label}]: {tls.version()} {name} ({fs}), certificate from {issuer}")
+        except Exception as error:
+            print(f"  {host} [{label}]: FAILED {error}")
 
 if problems:
     print(f"\n{len(problems)} link problem(s):")

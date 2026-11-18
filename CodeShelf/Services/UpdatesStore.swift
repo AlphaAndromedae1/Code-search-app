@@ -193,16 +193,26 @@ final class UpdatesStore {
         }
         let before = Set(items.map(\.id))
         let targets = followed.filter(\.checkable)
-        var loader: PageLinkLoader?
-        for (offset, source) in targets.enumerated() {
-            progressText = "Checking \(source.name) (\(offset + 1) of \(targets.count))…"
-            guard let url = URL(string: source.url) else { continue }
-            var links = await HTMLLinkFetcher.links(at: url)
-            if links.isEmpty && allowWebView {
-                // Pages built with JavaScript need a real browser engine.
-                if loader == nil { loader = PageLinkLoader() }
-                links = await loader?.links(at: url) ?? []
+        let pages: [(id: String, url: URL)] = targets.compactMap { source in
+            URL(string: source.url).map { (id: source.id, url: $0) }
+        }
+
+        // 1. Download every page at once (six at a time) instead of one after another.
+        progressText = "Checking \(pages.count) source\(pages.count == 1 ? "" : "s")…"
+        var found = await HTMLLinkFetcher.links(for: pages, concurrent: 6)
+
+        // 2. Pages built with JavaScript need a real browser engine: two at a time.
+        let needBrowser = pages.filter { (found[$0.id] ?? []).isEmpty }
+        if allowWebView && !needBrowser.isEmpty {
+            progressText = "Opening \(needBrowser.count) page\(needBrowser.count == 1 ? "" : "s") that need a browser…"
+            for (id, links) in await PageLinkLoader.links(for: needBrowser, concurrent: 2) {
+                found[id] = links
             }
+        }
+
+        // 3. Compare with last time, in the order the sources are listed.
+        for source in targets {
+            let links = found[source.id] ?? []
             if links.isEmpty {
                 lastProblems.append(source.name)
                 continue
@@ -499,20 +509,48 @@ final class PageLinkLoader {
     private let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1024, height: 1400), configuration: WKWebViewConfiguration())
 
     func links(at url: URL) async -> [PageLink] {
-        _ = webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30))
+        _ = webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20))
         do {
-            try await Task.sleep(for: .milliseconds(600))
+            try await Task.sleep(for: .milliseconds(400))
             var waited = 0
-            while webView.isLoading && waited < 120 {
+            while webView.isLoading && waited < 60 {
                 try await Task.sleep(for: .milliseconds(250))
                 waited += 1
             }
-            // Give script-built pages a moment to render their lists.
-            try await Task.sleep(for: .milliseconds(1500))
+            // Script-built pages fill in their lists after loading: read the links until they stop changing.
+            var previous = -1
+            for _ in 0..<5 {
+                let links = await PageLinkLoader.extractLinks(from: webView)
+                if !links.isEmpty && links.count == previous { return links }
+                previous = links.count
+                try await Task.sleep(for: .milliseconds(400))
+            }
         } catch {
             return []
         }
         return await PageLinkLoader.extractLinks(from: webView)
+    }
+
+    /// Loads several pages in off-screen browsers, `concurrent` at a time.
+    static func links(for pages: [(id: String, url: URL)], concurrent: Int) async -> [String: [PageLink]] {
+        var results: [String: [PageLink]] = [:]
+        var start = 0
+        while start < pages.count {
+            let slice = pages[start..<min(start + concurrent, pages.count)]
+            start += concurrent
+            await withTaskGroup(of: (String, [PageLink]).self) { group in
+                for page in slice {
+                    group.addTask { @MainActor in
+                        let loader = PageLinkLoader()
+                        return (page.id, await loader.links(at: page.url))
+                    }
+                }
+                for await (id, links) in group {
+                    results[id] = links
+                }
+            }
+        }
+        return results
     }
 
     static func extractLinks(from webView: WKWebView) async -> [PageLink] {

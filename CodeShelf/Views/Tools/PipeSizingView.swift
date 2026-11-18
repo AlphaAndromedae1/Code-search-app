@@ -94,7 +94,7 @@ struct PipeSizingView: View {
         } header: {
             Text("Piping")
         } footer: {
-            Text("Measure from the point of delivery (meter or regulator) to the most remote outlet, and use that one length for every section (A.3.4–A.3.5).\(material == .copperL ? " B149.1's tubing tables are for Type K; Type L is calculated the same way with its larger bore." : "")")
+            Text("Measure from the point of delivery (meter or regulator) to the most remote outlet, and use that one length for every section (A.3.4–A.3.5).\(materialNote)")
         }
     }
 
@@ -139,6 +139,14 @@ struct PipeSizingView: View {
     }
 
     // MARK: Values
+
+    private var materialNote: String {
+        switch material {
+        case .plastic: return " B149.1's pipe tables cover Schedule 40 and plastic pipe alike, so plastic is sized the same as black iron."
+        case .copperL: return " B149.1's tubing tables are for Type K; Type L is calculated the same way with its larger bore."
+        default: return ""
+        }
+    }
 
     private var system: GasSystem? {
         if systemID == "custom" {

@@ -88,6 +88,7 @@ jobs:
         run: |
           UDID=$(python3 Tests/pick_simulator.py)
           echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl list devices available | grep -B30 "$UDID" | grep -E "^-- iOS" | tail -1 | sed 's/^/Simulator runtime: /'
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
 

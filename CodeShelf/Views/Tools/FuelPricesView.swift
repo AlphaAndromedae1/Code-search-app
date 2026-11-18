@@ -5,6 +5,7 @@ struct FuelPricesView: View {
     @State private var prices = FuelPriceStore.shared
     @AppStorage(FuelPriceStore.marketKey) private var market = FuelPriceStore.averageMarket
     @AppStorage(FuelPriceStore.dyedDiscountKey) private var dyedDiscount = FuelPriceStore.defaultDyedDiscount
+    @AppStorage(FuelPriceStore.gasUtilityKey) private var gasUtility = FuelPriceStore.defaultGasUtility
 
     var body: some View {
         List {
@@ -27,7 +28,9 @@ struct FuelPricesView: View {
                 marketSection
                 ForEach(prices.rows(market: market, dyedDiscount: dyedDiscount)) { row in
                     PriceRowView(row: row)
+                        .id("\(row.id)-\(gasUtility)")
                 }
+                gasSection
                 dyedSection
                 furnaceOilSection
             }
@@ -66,7 +69,7 @@ struct FuelPricesView: View {
             }
         } footer: {
             if let fetched = prices.snapshot?.fetched {
-                Text("Cents per litre, taxes included. Checked \(fetched.formatted(.relative(presentation: .named))).")
+                Text("Fuels in cents per litre, taxes included; natural gas in cents per cubic metre, before HST. Checked \(fetched.formatted(.relative(presentation: .named))).")
             }
         }
     }
@@ -76,6 +79,34 @@ struct FuelPricesView: View {
         let all = prices.snapshot?.markets ?? [FuelPriceStore.averageMarket]
         let averages = all.filter { $0.contains("Average") }
         return averages + all.filter { !$0.contains("Average") }
+    }
+
+    @ViewBuilder
+    private var gasSection: some View {
+        let rates = prices.snapshot?.naturalGas ?? []
+        if !rates.isEmpty {
+            Section {
+                Picker("Gas utility", selection: $gasUtility) {
+                    ForEach(rates) { rate in
+                        Text(FuelPriceStore.displayName(ofUtility: rate.utility)).tag(rate.utility)
+                    }
+                }
+                ForEach(rates) { rate in
+                    HStack {
+                        Text(FuelPriceStore.displayName(ofUtility: rate.utility))
+                            .font(.callout)
+                        Spacer()
+                        Text("\(rate.centsPerCubicMetre.formatted(.number.precision(.fractionLength(2))))¢/m³")
+                            .monospacedDigit()
+                            .font(.callout)
+                    }
+                }
+            } header: {
+                Text("Natural gas supply charges\(prices.snapshot?.naturalGasEffective.map { ", \($0)" } ?? "")")
+            } footer: {
+                Text("Set by the Ontario Energy Board every quarter, with no markup. Enbridge's EGD zone covers most of the GTA, Ottawa and Niagara. Union South covers southwestern Ontario, Union North East covers places like Sudbury, North Bay and Timmins, and Union North West covers places like Thunder Bay and Kenora. Kitchener Utilities and Utilities Kingston aren't set by the OEB.")
+            }
+        }
     }
 
     private var dyedSection: some View {
@@ -151,6 +182,9 @@ struct FuelPricesView: View {
             Link(destination: FuelPriceSources.statCanPage) {
                 Label("Statistics Canada heating fuel prices (monthly)", systemImage: "link")
             }
+            Link(destination: FuelPriceSources.oebRates) {
+                Label("Ontario Energy Board natural gas rates", systemImage: "link")
+            }
         }
         .font(.callout)
     }
@@ -183,10 +217,10 @@ private struct PriceRowView: View {
                     Spacer()
                     VStack(alignment: .trailing, spacing: 2) {
                         if let cents = row.cents {
-                            Text("\(cents.formatted(.number.precision(.fractionLength(1))))¢")
+                            Text("\(cents.formatted(.number.precision(.fractionLength(row.per == "L" ? 1 : 2))))¢")
                                 .font(.title2.weight(.bold))
                                 .monospacedDigit()
-                            Text("$\((cents / 100).formatted(.number.precision(.fractionLength(3))))/L")
+                            Text("$\((cents / 100).formatted(.number.precision(.fractionLength(row.per == "L" ? 3 : 4))))/\(row.per)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()

@@ -61,7 +61,9 @@ struct CodeShelfApp: App {
                 "furnaceOilCities": prices.currentFurnaceOil.map(\.city),
                 "heatingMonthly": (prices.snapshot?.heatingMonthly ?? []).map { "\($0.city) \($0.centsPerLitre)" },
                 "furnaceProblem": prices.snapshot?.furnaceProblem ?? "",
-                "rows": rows.map { ["name": $0.name, "cents": $0.cents ?? -1, "date": $0.date, "note": $0.note ?? ""] as [String: Any] },
+                "rows": rows.map { ["name": $0.name, "cents": $0.cents ?? -1, "per": $0.per, "date": $0.date, "note": $0.note ?? ""] as [String: Any] },
+                "naturalGas": (prices.snapshot?.naturalGas ?? []).map { "\($0.utility): \($0.centsPerCubicMetre)" },
+                "naturalGasEffective": prices.snapshot?.naturalGasEffective ?? "",
             ])
         }
         guard let probe = defaults.string(forKey: "searchProbe"), !probe.isEmpty else { return }
@@ -129,6 +131,15 @@ struct CodeShelfApp: App {
             "B.1b 3m": row("lp-b1", .steelSch40, 3, .metric), "B.4b 3m": row("lp-b4", .steelSch40, 3, .metric),
             "exampleSize": pick?.size ?? "", "exampleRow": pick?.rowLength ?? 0,
             "fittingRows": withFittings.map(\.rowLength),
+            "plasticSameAsBlackIron": row("ng-a1", .plastic, 10) == row("ng-a1", .steelSch40, 10),
+        ]
+        let ratio = GasConversion.diameterRatio()
+        let conversion: [String: Any] = [
+            "diameterRatio": ratio,
+            "ng43": GasConversion.nearestDrill(to: 0.0890 * ratio).name,
+            "litrePropaneInM3": GasConversion.convert(1, from: .litresPropane, to: .cubicMetresNG, ngMJPerM3: 37.3),
+            "tdgCount": TDGReference.goods.count,
+            "tdgNumbers": TDGReference.goods.map(\.un),
         ]
         var csst: [String: Any] = ["tables": CSSTSizing.tables.count]
         if let table = CSSTSizing.tables.first(where: { $0.table == "7-1" }),
@@ -140,7 +151,7 @@ struct CodeShelfApp: App {
            let result = CSSTSizing.size(table: table, lengthFeet: 100, extraFittings: 0, loadBTU: 400_000) {
             csst["propane10psiSize"] = result.recommended?.size ?? ""
         }
-        return ["pipe": pipe, "csst": csst]
+        return ["pipe": pipe, "csst": csst, "conversion": conversion]
     }
 
     private func writeProbe(_ name: String, _ object: [String: Any]) {

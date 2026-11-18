@@ -14,7 +14,7 @@ Your library stays on your device. The app goes online only to check the TSSA, C
 - Import PDFs from the Files app, iCloud Drive, email attachments, or the share sheet (“Open in CodeShelf”).
 - Books are auto-sorted by category from the file name (e.g. `2024_OBC.pdf` becomes *Building · OBC 2024*, `CSA B149.1-25.pdf` becomes *Gas & Propane · B149.1 2025*, `ASHRAE 90.1-2019.pdf` becomes *Standards · ASHRAE 90.1 2019*, `2-7-26.pdf` becomes *Bulletins & Updates · Bulletin 2-7-26 (ESA)*). Title, short name, category, jurisdiction, edition and notes are all editable.
 - Categories: Building, Residential, Fire, Electrical, Plumbing, Mechanical, **Gas & Propane** (CSA B149.1 Natural Gas and Propane Installation Code, B149.2 Propane Storage and Handling Code, TSSA adoption documents), **Fuel Oil & Petroleum** (CSA B139 oil-burning equipment, Fuel Oil and Liquid Fuels regulations, TSSA Liquid Fuels Handling Code for gasoline and diesel), Energy, Accessibility, Municipal By-laws, **Standards** (NFPA, ASHRAE, ASTM, ULC and other CSA standards the codes reference), **Manufacturer Instructions**, and Bulletins & Updates.
-- Every page is indexed for full-text search in the background. Scanned PDFs (no selectable text) are read with Apple's on-device text recognition (OCR).
+- Every page is indexed for full-text search in the background. Scanned PDFs (no selectable text) are read with Apple's on-device text recognition (OCR). OCR reads several pages at once at about 190 dpi, with English-only recognition, so large books finish much sooner.
 
 **Search everything**
 - One search box across every book. **Code books always come first**, then bulletins, then manufacturer instructions, each grouped by book with the best matches first. A long manual can't push your code book off the list. Snippets highlight what matched.
@@ -45,7 +45,7 @@ Your library stays on your device. The app goes online only to check the TSSA, C
     - 2 psi (1 or 1.5 psi drop)
     - 5 psi (2.5 psi drop), 10 psi (5 psi drop) and 20 psi (10 psi drop)
     - a custom pressure and drop
-  - **Pipe:** Schedule 40 steel or Type K copper, the tables' inside diameters. Type L copper is calculated the same way.
+  - **Pipe:** black iron (Schedule 40), plastic (PE) or Type K copper, using the tables' inside diameters. B149.1's pipe tables cover "Schedule 40 pipe and plastic pipe" alike. Type L copper is calculated the same way.
   - **Units:** imperial (ft, MBH) or metric (m, kW).
   - **Fittings:** the 20% allowance where the tables include it. For the 5, 10 and 20 psi tables, you enter fittings and they're added as Table A.16 equivalent lengths.
   - **Reading the table:** like the tables, it uses the next larger length (A.3.5) and the first size that covers the load (A.3.7).
@@ -58,8 +58,14 @@ Your library stays on your device. The app goes online only to check the TSSA, C
   - **Other brands:** TracPipe and WARDFlex have different EHDs, so use their tables in the Fuel Equipment Library.
 - **Fuel Prices (CAD):** this week's propane, furnace oil, regular and premium gasoline, diesel and dyed diesel, in cents per litre with the change from last week. Pick the Ontario average or your area.
   - **Gasoline, diesel and auto propane:** the Ontario Ministry of Energy's weekly survey of 14 markets.
-  - **Furnace oil:** Natural Resources Canada's weekly prices for the Ontario cities it surveys. Statistics Canada's monthly household heating fuel prices fill in for Toronto, Ottawa and Thunder Bay, and back up NRCan if it's unreachable.
+  - **Furnace oil:** Natural Resources Canada's weekly prices for the Ontario cities it surveys. Statistics Canada's monthly household heating fuel prices fill in for Toronto, Ottawa and Thunder Bay when its site answers apps (it sometimes shows a browser security check). If a government server refuses the secure connection or answers 403, the app retries once over TLS 1.2.
+  - **Natural gas:** the Ontario Energy Board's current gas supply charge (¢/m³) for each utility and rate zone it sets (Enbridge EGD, Union South, North East and North West, EPCOR), with the date it took effect. Pick your utility; delivery and customer charges are extra.
   - **Dyed diesel:** an estimate, since no public survey reports it. It's clear diesel minus Ontario's 9.0¢/L diesel tax and the HST on it (10.2¢/L, adjustable).
+- **Natural Gas ⇄ Propane:**
+  - **Properties:** heating value, relative density, typical supply and manifold pressures, combustion air, flammable range and more, side by side.
+  - **Energy equivalents:** m³ and ft³ of natural gas, litres, US gallons, pounds and kilograms of propane, kWh, MJ, Btu and therms.
+  - **Orifice drills:** a #20–#80 conversion table for the same input. The propane orifice is about 0.61 × the natural gas diameter at 3.5" and 10" w.c., and you can change the pressures. Conversions must still use the manufacturer's kit.
+- **TDG – Fuels:** UN numbers, proper shipping names, classes, packing groups and ERG 2024 guides. Covers propane and LPG (UN1075, UN1978), butane, natural gas (CNG UN1971, LNG UN1972), gasoline (UN1203), diesel, dyed diesel and furnace oil (UN1202), kerosene, jet fuel, ethanol blends, acetylene and the propane odorant, plus the CANUTEC emergency numbers.
 - **Compare** (below) is in Tools too.
 
 **Compare** (Tools → Compare)

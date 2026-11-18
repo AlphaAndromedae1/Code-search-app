@@ -161,7 +161,7 @@ struct GasSystem: Identifiable, Hashable, Sendable {
     }
 
     func table(for material: PipeMaterial, units: UnitSystem) -> String? {
-        guard material != .copperL, let base = material == .steelSch40 ? steelTable : tubingTable else { return nil }
+        guard material != .copperL, let base = material.usesPipeTables ? steelTable : tubingTable else { return nil }
         return "Table \(base) \(units == .imperial ? "a" : "b"))"
     }
 
@@ -219,7 +219,10 @@ struct GasSystem: Identifiable, Hashable, Sendable {
 }
 
 enum PipeMaterial: String, CaseIterable, Identifiable, Codable, Sendable {
+    /// Black iron (Schedule 40 steel) pipe.
     case steelSch40
+    /// Plastic (PE) pipe: B149.1 Tables A.1–A.7 and B.1–B.5 cover "Schedule 40 pipe and plastic pipe" alike.
+    case plastic
     case copperK
     case copperL
 
@@ -227,18 +230,21 @@ enum PipeMaterial: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var label: String {
         switch self {
-        case .steelSch40: return "Steel, Schedule 40"
+        case .steelSch40: return "Black iron (Schedule 40)"
+        case .plastic: return "Plastic (PE)"
         case .copperK: return "Copper tubing, Type K"
         case .copperL: return "Copper tubing, Type L"
         }
     }
 
-    var isTubing: Bool { self != .steelSch40 }
+    var isTubing: Bool { self == .copperK || self == .copperL }
+    /// Sized from the pipe tables (A.1–A.7, B.1–B.5), which apply to Schedule 40 and plastic pipe.
+    var usesPipeTables: Bool { self == .steelSch40 || self == .plastic }
 
     /// Nominal pipe size (steel) or tubing outside diameter, with the inside diameter in inches.
     var sizes: [(name: String, id: Double)] {
         switch self {
-        case .steelSch40:
+        case .steelSch40, .plastic:
             return [("1/2\"", 0.622), ("3/4\"", 0.824), ("1\"", 1.049), ("1-1/4\"", 1.380), ("1-1/2\"", 1.610),
                     ("2\"", 2.067), ("2-1/2\"", 2.469), ("3\"", 3.068), ("4\"", 4.026)]
         case .copperK:

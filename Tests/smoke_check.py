@@ -193,6 +193,14 @@ for key, expected, what in [
     check(near(pipe.get(key, []), expected), f"pipe sizing matches B149.1 Table {key.split()[0]} ({what}): {pipe.get(key, [])[:len(expected)]}")
 check(pipe.get("exampleSize") == '1"' and pipe.get("exampleRow") == 50,
       "150 MBH over 45 ft at 7 in. w.c. reads the 50 ft row and picks 1 in. (A.3.5 / A.3.7)")
+check(pipe.get("plasticSameAsBlackIron") is True,
+      "plastic pipe is sized with the same B149.1 tables as black iron (Schedule 40 and plastic pipe)")
+conv = calc.get("conversion", {})
+check(abs(conv.get("diameterRatio", 0) - 0.611) < 0.002 and conv.get("ng43") == "#54",
+      f"natural gas #43 orifice converts to propane #54 (diameter ratio {conv.get('diameterRatio')})")
+check(abs(conv.get("litrePropaneInM3", 0) - 0.678) < 0.002, "1 L of propane = 0.678 m3 of natural gas at 37.3 MJ/m3")
+check({"UN1075", "UN1978", "UN1971", "UN1203", "UN1202"} <= set(conv.get("tdgNumbers", [])),
+      f"TDG reference lists propane (UN1075, UN1978), natural gas, gasoline and diesel ({conv.get('tdgCount')} entries)")
 rows = pipe.get("fittingRows", [])
 check(len(rows) == 9 and rows[0] == 100 and rows[-1] == 125,
       "5 psi table: two 90-degree elbows (Table A.16) move 1/2 in. to the 100 ft row and 4 in. to 125 ft")
