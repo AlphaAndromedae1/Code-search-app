@@ -70,11 +70,12 @@ struct CodeShelfApp: App {
                     let url = URL(string: "https://www2.nrcan.gc.ca/eneene/sources/pripri/webfeed_e.cfm?priceYear=\(year)&productID=7&locationID=72")!
                     let session = URLSession(configuration: .ephemeral, delegate: NRCanTrustDelegate(anchorOnlyForTesting: true), delegateQueue: nil)
                     do {
-                        let (data, _) = try await session.data(from: url)
+                        let (data, response) = try await session.data(from: url)
                         if let text = String(data: data, encoding: .utf8), let reading = FuelPriceSources.parseNRCanFeed(text) {
                             return "Kingston \(reading.dollars) $/L"
                         }
-                        return "no price in \(data.count) bytes"
+                        // The secure connection was accepted; NRCan just didn't send prices (e.g. 503 when busy).
+                        return "connected (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)), no price in \(data.count) bytes"
                     } catch {
                         return "failed: \(error.localizedDescription)"
                     }

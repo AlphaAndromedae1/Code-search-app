@@ -28,8 +28,8 @@ print(f"Heating fuel, monthly (Statistics Canada): {', '.join(probe.get('heating
 print(f"Furnace oil problems: {probe.get('furnaceProblem') or 'none'}")
 pinned = probe.get("pinnedNRCan", "")
 print(f"NRCan trusting only the bundled Sectigo R46 root: {pinned or 'not run'}")
-if not pinned.startswith("Kingston"):
-    print("BAD  NRCan couldn't be verified with the bundled root")
+if not (pinned.startswith("Kingston") or pinned.startswith("connected")):
+    print("BAD  NRCan's certificate couldn't be verified with the bundled root")
     sys.exit(1)
 ok = True
 print(f"Natural gas ({probe.get('naturalGasEffective') or 'no date'}): {'; '.join(probe.get('naturalGas', [])) or 'none'}")

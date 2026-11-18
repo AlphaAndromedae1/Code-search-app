@@ -552,7 +552,46 @@ enum FuelPriceSources {
             }
             if problems.isEmpty { break } // reached NRCan; it just had no prices
         }
-        return Readings(readings: [], problem: problems.isEmpty ? "no furnace oil prices listed" : problems.joined(separator: " | "))
+
+        // When NRCan is busy the big table page is the first to fail (503): fall back to the small
+        // per-city feeds, two at a time.
+        var readings: [FuelPriceSnapshot.CityReading] = []
+        var feedProblems: [String] = []
+        let reporting = Array(nrcanCities.prefix(8)) // the cities that report furnace oil
+        for start in stride(from: 0, to: reporting.count, by: 2) {
+            let pair = reporting[start..<min(start + 2, reporting.count)]
+            await withTaskGroup(of: (FuelPriceSnapshot.CityReading?, String?).self) { group in
+                for city in pair {
+                    group.addTask { await loadNRCanFeed(city: city, year: year) }
+                }
+                for await (reading, problem) in group {
+                    if let reading { readings.append(reading) }
+                    if let problem { feedProblems.append(problem) }
+                }
+            }
+            if readings.isEmpty && feedProblems.count >= 4 { break } // NRCan isn't answering at all
+        }
+        if !readings.isEmpty { return Readings(readings: readings, problem: nil) }
+        let all = problems + feedProblems.prefix(2)
+        return Readings(readings: [], problem: all.isEmpty ? "no furnace oil prices listed" : all.joined(separator: " | "))
+    }
+
+    /// One city's weekly furnace oil feed (RSS), trying both NRCan host names.
+    private static func loadNRCanFeed(city: (name: String, id: Int), year: Int) async -> (FuelPriceSnapshot.CityReading?, String?) {
+        var problem: String?
+        for host in nrcanHosts {
+            guard let url = URL(string: "https://\(host)/eneene/sources/pripri/webfeed_e.cfm?priceYear=\(year)&productID=7&locationID=\(city.id)") else { continue }
+            let result = await fetch(URLRequest(url: url, timeoutInterval: 30))
+            guard let data = result.data else {
+                problem = "\(city.name) feed, \(host): \(result.problem ?? "failed")"
+                continue
+            }
+            if let reading = parseNRCanFeed(String(decoding: data, as: UTF8.self)) {
+                return (FuelPriceSnapshot.CityReading(city: city.name, locationID: city.id, dollarsPerLitre: reading.dollars, date: reading.date, source: "NRCan"), nil)
+            }
+            return (nil, nil) // reached NRCan; no recent price for this city
+        }
+        return (nil, problem)
     }
 
     /// NRCan's "Weekly Average Retail Prices for Furnace Oil" table: a column group per city (price, taxes,
