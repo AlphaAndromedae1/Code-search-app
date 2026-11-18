@@ -98,7 +98,7 @@ final class FuelPriceStore {
     var isStale: Bool {
         guard let snapshot else { return true }
         // Saved before furnace oil loaded (or by an older version): try again right away.
-        if snapshot.heatingMonthly == nil || (snapshot.furnaceOil.isEmpty && (snapshot.heatingMonthly ?? []).isEmpty)
+        if snapshot.heatingMonthly == nil || snapshot.furnaceOil.isEmpty
             || (snapshot.naturalGas ?? []).isEmpty {
             return true
         }
@@ -433,6 +433,7 @@ enum FuelPriceSources {
         guard first.data == nil, first.retry else { return (first.data, first.problem) }
         let second = await attempt(request, session: tls12Session)
         if second.data != nil { return (second.data, nil) }
+        if first.problem == second.problem { return (nil, "\(first.problem ?? "failed") (also over TLS 1.2)") }
         return (nil, "\(first.problem ?? "failed"); over TLS 1.2: \(second.problem ?? "failed")")
     }
 
@@ -572,8 +573,13 @@ enum FuelPriceSources {
             if readings.isEmpty && feedProblems.count >= 4 { break } // NRCan isn't answering at all
         }
         if !readings.isEmpty { return Readings(readings: readings, problem: nil) }
-        let all = problems + feedProblems.prefix(2)
-        return Readings(readings: [], problem: all.isEmpty ? "no furnace oil prices listed" : all.joined(separator: " | "))
+        // The same failure usually repeats for every address and city: report each distinct one once.
+        var distinct: [String] = []
+        for problem in problems + feedProblems {
+            let reason = problem.range(of: ".gc.ca: ").map { String(problem[$0.upperBound...]) } ?? problem
+            if !distinct.contains(reason) { distinct.append(reason) }
+        }
+        return Readings(readings: [], problem: distinct.isEmpty ? "no furnace oil prices listed" : distinct.joined(separator: " | "))
     }
 
     /// One city's weekly furnace oil feed (RSS), trying both NRCan host names.
@@ -706,8 +712,10 @@ enum FuelPriceSources {
 
     static func parseStatCan(_ data: Data) -> [FuelPriceSnapshot.CityReading] {
         guard let items = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
-        let dates = ISO8601DateFormatter()
-        dates.formatOptions = [.withFullDate]
+        // "2026-10-01" is the October figure: read it as local midnight, not UTC (which is Sept 30 in Ontario).
+        let dates = DateFormatter()
+        dates.locale = Locale(identifier: "en_US_POSIX")
+        dates.dateFormat = "yyyy-MM-dd"
         var readings: [FuelPriceSnapshot.CityReading] = []
         for item in items {
             guard let object = item["object"] as? [String: Any],
