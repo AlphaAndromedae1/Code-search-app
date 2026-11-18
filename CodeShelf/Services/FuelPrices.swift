@@ -109,43 +109,63 @@ final class FuelPriceStore {
         if isStale { await refresh() }
     }
 
+    /// Furnace oil is still downloading (NRCan's server can be slow); the other prices are already shown.
+    private(set) var isLoadingFurnaceOil = false
+
     func refresh() async {
         guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            isLoadingFurnaceOil = false
+        }
 
         async let ontario = FuelPriceSources.loadOntario()
+        async let gas = FuelPriceSources.loadOEBNaturalGas()
         async let weekly = FuelPriceSources.loadFurnaceOil()
         async let monthly = FuelPriceSources.loadStatCanHeatingFuel()
-        async let gas = FuelPriceSources.loadOEBNaturalGas()
-        let (surveyResult, oil, heating, gasRates) = await (ontario, weekly, monthly, gas)
 
+        // 1. Gasoline, diesel, propane and natural gas: show them as soon as they arrive.
+        let (surveyResult, gasRates) = await (ontario, gas)
         guard let survey = surveyResult.value else {
             errorMessage = "Couldn't download Ontario's fuel price survey (\(surveyResult.problem ?? "no data")). Showing the last prices saved."
             return
         }
-        var problems: [String] = []
-        if oil.readings.isEmpty { problems.append("NRCan: \(oil.problem ?? "no prices listed")") }
-        if heating.readings.isEmpty { problems.append("Statistics Canada: \(heating.problem ?? "no prices listed")") }
-        let fresh = FuelPriceSnapshot(
+        var fresh = FuelPriceSnapshot(
             markets: survey.markets,
             series: survey.series,
-            furnaceOil: oil.readings.isEmpty ? (snapshot?.furnaceOil ?? []) : oil.readings,
-            heatingMonthly: heating.readings.isEmpty ? snapshot?.heatingMonthly : heating.readings,
-            furnaceProblem: problems.isEmpty ? nil : problems.joined(separator: "; "),
+            furnaceOil: snapshot?.furnaceOil ?? [],
+            heatingMonthly: snapshot?.heatingMonthly,
+            furnaceProblem: snapshot?.furnaceProblem,
             naturalGas: gasRates.value?.rates ?? snapshot?.naturalGas,
             naturalGasEffective: gasRates.value?.effective ?? snapshot?.naturalGasEffective,
             naturalGasProblem: gasRates.problem,
             fetched: Date()
         )
         snapshot = fresh
+        save(fresh)
+
+        // 2. Furnace oil, which can take longer.
+        isLoadingFurnaceOil = true
+        let (oil, heating) = await (weekly, monthly)
+        var problems: [String] = []
+        if oil.readings.isEmpty { problems.append("NRCan: \(oil.problem ?? "no prices listed")") }
+        if heating.readings.isEmpty { problems.append("Statistics Canada: \(heating.problem ?? "no prices listed")") }
+        if !oil.readings.isEmpty { fresh.furnaceOil = oil.readings }
+        if !heating.readings.isEmpty { fresh.heatingMonthly = heating.readings }
+        fresh.furnaceProblem = problems.isEmpty ? nil : problems.joined(separator: "; ")
+        snapshot = fresh
+        save(fresh)
         if oil.readings.isEmpty && heating.readings.isEmpty {
             errorMessage = "Couldn't download furnace oil prices. \(problems.joined(separator: "; "))."
         }
+    }
+
+    private func save(_ snapshot: FuelPriceSnapshot) {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        if let data = try? encoder.encode(fresh) {
+        if let data = try? encoder.encode(snapshot) {
             try? FileManager.default.createDirectory(at: AppPaths.root, withIntermediateDirectories: true)
             try? data.write(to: Self.cacheURL, options: .atomic)
         }
@@ -380,8 +400,8 @@ enum FuelPriceSources {
     /// (see NRCanTrustDelegate: some iPhones don't have the root NRCan's certificate chains to).
     private static let session: URLSession = {
         let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 20
-        configuration.timeoutIntervalForResource = 45
+        configuration.timeoutIntervalForRequest = 60
+        configuration.timeoutIntervalForResource = 90
         return URLSession(configuration: configuration, delegate: NRCanTrustDelegate(), delegateQueue: nil)
     }()
 
@@ -389,8 +409,8 @@ enum FuelPriceSources {
     private static let tls12Session: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.tlsMaximumSupportedProtocolVersion = .TLSv12
-        configuration.timeoutIntervalForRequest = 20
-        configuration.timeoutIntervalForResource = 45
+        configuration.timeoutIntervalForRequest = 60
+        configuration.timeoutIntervalForResource = 90
         configuration.httpAdditionalHeaders = ["Accept-Language": "en-CA,en;q=0.9"]
         return URLSession(configuration: configuration, delegate: NRCanTrustDelegate(), delegateQueue: nil)
     }()
@@ -400,7 +420,7 @@ enum FuelPriceSources {
     static func fetch(_ request: URLRequest) async -> (data: Data?, problem: String?) {
         var request = request
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.timeoutInterval = 20
+        request.timeoutInterval = min(request.timeoutInterval, 60)
         if request.value(forHTTPHeaderField: "Accept") == nil {
             request.setValue("text/csv, application/rss+xml, application/json, text/html, */*", forHTTPHeaderField: "Accept")
         }
@@ -505,55 +525,70 @@ enum FuelPriceSources {
         return String(text[from.upperBound..<to.lowerBound])
     }
 
-    /// One city's latest weekly furnace oil price. Tries both NRCan host names, and last year's
-    /// feed early in January when this year's is still empty.
-    private static func loadNRCanCity(name: String, id: Int, year: Int) async -> (reading: FuelPriceSnapshot.CityReading?, problem: String?) {
-        var problem: String?
+    /// This week's furnace oil price for every Ontario city NRCan surveys, from one page (NRCan's server can
+    /// be slow, so one request beats eleven). Tries both NRCan host names, and last year's table in January.
+    static func loadFurnaceOil() async -> Readings {
+        let calendar = Calendar(identifier: .gregorian)
+        let year = calendar.component(.year, from: Date())
+        let years = calendar.component(.month, from: Date()) == 1 ? [year, year - 1] : [year]
+        let ids = nrcanCities.map { String($0.id) }.joined(separator: ",")
+        var problems: [String] = []
         for host in nrcanHosts {
-            var hostProblem: String?
-            for priceYear in [year, year - 1] {
-                guard let url = URL(string: "https://\(host)/eneene/sources/pripri/webfeed_e.cfm?priceYear=\(priceYear)&productID=7&locationID=\(id)") else { continue }
-                let result = await fetch(url)
+            for priceYear in years {
+                guard let url = URL(string: "https://\(host)/eneene/sources/pripri/prices_bycity_e.cfm?productID=7&locationID=\(ids)&frequency=W&priceYear=\(priceYear)") else { continue }
+                let result = await fetch(URLRequest(url: url, timeoutInterval: 60))
                 guard let data = result.data else {
-                    hostProblem = result.problem
-                    break // this host failed; try the other one
+                    problems.append("\(host): \(result.problem ?? "failed")")
+                    break // try the other host name
                 }
-                if let text = String(data: data, encoding: .utf8), let reading = parseNRCanFeed(text) {
-                    return (FuelPriceSnapshot.CityReading(city: name, locationID: id, dollarsPerLitre: reading.dollars, date: reading.date, source: "NRCan"), nil)
-                }
+                let readings = parseNRCanTable(String(decoding: data, as: UTF8.self))
+                if !readings.isEmpty { return Readings(readings: readings, problem: nil) }
             }
-            // Reached NRCan, and this city just has no recent furnace oil price.
-            guard let hostProblem else { return (nil, nil) }
-            problem = [problem, "\(host): \(hostProblem)"].compactMap { $0 }.joined(separator: " | ")
+            if problems.isEmpty { break } // reached NRCan; it just had no prices
         }
-        return (nil, problem)
+        return Readings(readings: [], problem: problems.isEmpty ? "no furnace oil prices listed" : problems.joined(separator: " | "))
     }
 
-    static func loadFurnaceOil() async -> Readings {
-        let year = Calendar(identifier: .gregorian).component(.year, from: Date())
-        var readings: [FuelPriceSnapshot.CityReading] = []
-        var problems: [String] = []
-        // A few at a time, so the government server isn't hit with a burst of requests.
-        let batches = stride(from: 0, to: nrcanCities.count, by: 4).map { Array(nrcanCities[$0..<min($0 + 4, nrcanCities.count)]) }
-        for batch in batches {
-            await withTaskGroup(of: (FuelPriceSnapshot.CityReading?, String?).self) { group in
-                for city in batch {
-                    group.addTask {
-                        let result = await loadNRCanCity(name: city.name, id: city.id, year: year)
-                        return (result.reading, result.problem)
-                    }
-                }
-                for await (reading, problem) in group {
-                    if let reading { readings.append(reading) }
-                    if let problem { problems.append(problem) }
-                }
-            }
-            // Every city in the first batch failed to download: the service is unreachable, stop here.
-            if readings.isEmpty && problems.count == batch.count && batch.first?.id == nrcanCities.first?.id {
-                break
+    /// NRCan's "Weekly Average Retail Prices for Furnace Oil" table: a column group per city (price, taxes,
+    /// marketing margin, refining margin) and a row per week. Returns each city's latest price.
+    static func parseNRCanTable(_ html: String) -> [FuelPriceSnapshot.CityReading] {
+        guard let start = html.range(of: "id=\"pricesTable\""),
+              let end = html.range(of: "</table>", range: start.upperBound..<html.endIndex)
+        else { return [] }
+        let table = String(html[start.lowerBound..<end.lowerBound])
+        guard let headerPattern = try? NSRegularExpression(pattern: #"<th[^>]*id="header3_\d+"[^>]*>([\s\S]*?)</th>"#) else { return [] }
+        let ns = table as NSString
+        let cities = headerPattern.matches(in: table, range: NSRange(location: 0, length: ns.length)).map {
+            plainText(">" + ns.substring(with: $0.range(at: 1)))
+        }
+        var rows: [[String]] = []
+        for row in table.components(separatedBy: "<tr").dropFirst() {
+            let cells = row.components(separatedBy: "<t").dropFirst()
+                .filter { $0.hasPrefix("d") || $0.hasPrefix("h") }
+                .map { plainText($0) }
+            if cells.count > 1, cells[0].range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil {
+                rows.append(cells)
             }
         }
-        return Readings(readings: readings, problem: readings.isEmpty ? problems.first : nil)
+        let key = { (name: String) in name.lowercased().filter { $0.isLetter } }
+        let dates = DateFormatter()
+        dates.locale = Locale(identifier: "en_US_POSIX")
+        dates.dateFormat = "yyyy-MM-dd"
+        var readings: [FuelPriceSnapshot.CityReading] = []
+        for (column, city) in cities.enumerated() {
+            guard let match = nrcanCities.first(where: { key($0.name) == key(city) }) else { continue }
+            let priceIndex = 1 + column * 4
+            for row in rows.reversed() where row.count > priceIndex {
+                if let cents = Double(row[priceIndex].replacingOccurrences(of: ",", with: "")), cents > 0,
+                   let date = dates.date(from: row[0]) {
+                    readings.append(FuelPriceSnapshot.CityReading(
+                        city: match.name, locationID: match.id, dollarsPerLitre: cents / 100, date: date, source: "NRCan"
+                    ))
+                    break
+                }
+            }
+        }
+        return readings
     }
 
     /// Statistics Canada's latest monthly household heating fuel price for Toronto, Ottawa and Thunder Bay.

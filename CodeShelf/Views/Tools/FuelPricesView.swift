@@ -62,6 +62,14 @@ struct FuelPricesView: View {
                     Text(FuelPriceStore.displayName(ofMarket: name)).tag(name)
                 }
             }
+            if prices.isLoadingFurnaceOil {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Getting furnace oil prices from NRCan…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             if let message = prices.errorMessage {
                 Label(message, systemImage: "wifi.exclamationmark")
                     .font(.caption)
