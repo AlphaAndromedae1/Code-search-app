@@ -26,6 +26,11 @@ print(f"Survey markets: {probe['markets']}  error: {probe['error'] or 'none'}")
 print(f"Furnace oil cities: {', '.join(probe['furnaceOilCities']) or 'none'}")
 print(f"Heating fuel, monthly (Statistics Canada): {', '.join(probe.get('heatingMonthly', [])) or 'none'}")
 print(f"Furnace oil problems: {probe.get('furnaceProblem') or 'none'}")
+web = probe.get("webFallback", [])
+print(f"Furnace oil read from NRCan's web page (fallback): {', '.join(web) or 'none'}")
+if not web:
+    print("BAD  the web page fallback read no furnace oil prices")
+    sys.exit(1)
 ok = True
 print(f"Natural gas ({probe.get('naturalGasEffective') or 'no date'}): {'; '.join(probe.get('naturalGas', [])) or 'none'}")
 for row in probe["rows"]:

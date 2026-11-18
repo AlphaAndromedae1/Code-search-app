@@ -1,6 +1,7 @@
 import Foundation
 import Security
 import SwiftUI
+import WebKit
 
 /// Weekly retail fuel prices in Ontario (cents per litre, taxes included).
 ///
@@ -515,7 +516,7 @@ enum FuelPriceSources {
             }
             // Reached NRCan, and this city just has no recent furnace oil price.
             guard let hostProblem else { return (nil, nil) }
-            problem = "\(host): \(hostProblem)"
+            problem = [problem, "\(host): \(hostProblem)"].compactMap { $0 }.joined(separator: " | ")
         }
         return (nil, problem)
     }
@@ -543,6 +544,14 @@ enum FuelPriceSources {
             if readings.isEmpty && problems.count == batch.count && batch.first?.id == nrcanCities.first?.id {
                 break
             }
+        }
+        if readings.isEmpty, !problems.isEmpty {
+            // The app's own downloads couldn't reach NRCan: read its price table the way Safari does.
+            let fromPage = await NRCanWebFallback.readings(cities: nrcanCities, year: year)
+            if !fromPage.isEmpty {
+                return Readings(readings: fromPage, problem: nil)
+            }
+            return Readings(readings: [], problem: (problems.first ?? "") + " | web page fallback: no prices read")
         }
         return Readings(readings: readings, problem: readings.isEmpty ? problems.first : nil)
     }
@@ -638,6 +647,74 @@ enum FuelPriceSources {
                 readings.append(FuelPriceSnapshot.CityReading(
                     city: city.name, locationID: id, dollarsPerLitre: latest.1 / 100, date: latest.0, source: "Statistics Canada"
                 ))
+            }
+        }
+        return readings
+    }
+}
+
+/// Reads NRCan's weekly furnace oil table in a hidden web view, the same engine Safari uses, for when the
+/// app's own downloads can't connect to NRCan (seen on some phones while Safari opens the page fine).
+@MainActor
+enum NRCanWebFallback {
+    private struct Table: Decodable {
+        let cities: [String]
+        let rows: [[String]]
+    }
+
+    private static let script = """
+    (() => {
+      const table = document.getElementById('pricesTable');
+      if (!table) { return null; }
+      const cities = Array.from(table.querySelectorAll('thead th[id^="header3_"]')).map(th => th.textContent.trim());
+      const rows = Array.from(table.querySelectorAll('tr'))
+        .map(tr => Array.from(tr.querySelectorAll('td, th')).map(cell => cell.textContent.trim()))
+        .filter(cells => cells.length > 1 && /^\\d{4}-\\d{2}-\\d{2}$/.test(cells[0]));
+      return JSON.stringify({ cities: cities, rows: rows });
+    })()
+    """
+
+    static func readings(cities: [(name: String, id: Int)], year: Int) async -> [FuelPriceSnapshot.CityReading] {
+        let ids = cities.map { String($0.id) }.joined(separator: ",")
+        guard let url = URL(string: "https://www2.nrcan.gc.ca/eneene/sources/pripri/prices_bycity_e.cfm?productID=7&locationID=\(ids)&frequency=W&priceYear=\(year)&Redisplay=") else {
+            return []
+        }
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1024, height: 1400))
+        webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30))
+        var json: String?
+        for _ in 0..<70 { // up to about 35 seconds: the page is large
+            try? await Task.sleep(for: .milliseconds(500))
+            if webView.isLoading { continue }
+            let value = try? await webView.evaluateJavaScript(script)
+            if let text = value as? String {
+                json = text
+                break
+            }
+        }
+        guard let json, let data = json.data(using: .utf8), let table = try? JSONDecoder().decode(Table.self, from: data) else {
+            return []
+        }
+        return parse(cities: table.cities, rows: table.rows, known: cities)
+    }
+
+    /// Latest non-empty price per city. Each city has four columns: price, taxes, marketing and refining margin.
+    nonisolated static func parse(cities: [String], rows: [[String]], known: [(name: String, id: Int)]) -> [FuelPriceSnapshot.CityReading] {
+        let key = { (name: String) in name.lowercased().filter { $0.isLetter } }
+        let dates = DateFormatter()
+        dates.locale = Locale(identifier: "en_US_POSIX")
+        dates.dateFormat = "yyyy-MM-dd"
+        var readings: [FuelPriceSnapshot.CityReading] = []
+        for (column, city) in cities.enumerated() {
+            guard let match = known.first(where: { key($0.name) == key(city) }) else { continue }
+            let priceIndex = 1 + column * 4
+            for row in rows.reversed() where row.count > priceIndex {
+                if let cents = Double(row[priceIndex].replacingOccurrences(of: ",", with: "")), cents > 0,
+                   let date = dates.date(from: row[0]) {
+                    readings.append(FuelPriceSnapshot.CityReading(
+                        city: match.name, locationID: match.id, dollarsPerLitre: cents / 100, date: date, source: "NRCan (web page)"
+                    ))
+                    break
+                }
             }
         }
         return readings

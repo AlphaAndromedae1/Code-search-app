@@ -64,6 +64,10 @@ struct CodeShelfApp: App {
                 "rows": rows.map { ["name": $0.name, "cents": $0.cents ?? -1, "per": $0.per, "date": $0.date, "note": $0.note ?? ""] as [String: Any] },
                 "naturalGas": (prices.snapshot?.naturalGas ?? []).map { "\($0.utility): \($0.centsPerCubicMetre)" },
                 "naturalGasEffective": prices.snapshot?.naturalGasEffective ?? "",
+                "webFallback": await NRCanWebFallback.readings(
+                    cities: FuelPriceSources.nrcanCities,
+                    year: Calendar(identifier: .gregorian).component(.year, from: Date())
+                ).map { "\($0.city) \($0.centsPerLitre)" },
             ])
         }
         guard let probe = defaults.string(forKey: "searchProbe"), !probe.isEmpty else { return }

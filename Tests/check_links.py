@@ -60,7 +60,8 @@ sources = set()
 for path in ["CodeShelf/Services/UpdatesStore.swift", "CodeShelf/Services/Ontario.swift", "CodeShelf/Services/FuelPrices.swift"]:
     for url in re.findall(r'"(https://[^"\\]+)"', (ROOT / path).read_text()):
         # Search engines aren't checked; the StatCan web service only answers POSTs (checked below).
-        if "google." not in url and "/wds/rest/" not in url:
+        # Statistics Canada is checked separately below (it sometimes shows apps a browser security check).
+        if "google." not in url and "statcan.gc.ca" not in url:
             sources.add(url)
 for url in sorted(sources):
     status, kind, _ = fetch(url, limit=512)
