@@ -424,30 +424,36 @@ enum FuelPriceSources {
         if request.value(forHTTPHeaderField: "Accept") == nil {
             request.setValue("text/csv, application/rss+xml, application/json, text/html, */*", forHTTPHeaderField: "Accept")
         }
-        let first = await attempt(request, session: session)
+        var first = await attempt(request, session: session)
+        // Busy government servers answer 502/503/504 now and then: wait a moment and try again (twice).
+        for delay in [2, 5] where first.data == nil && first.busy {
+            try? await Task.sleep(for: .seconds(delay))
+            first = await attempt(request, session: session)
+        }
         guard first.data == nil, first.retry else { return (first.data, first.problem) }
         let second = await attempt(request, session: tls12Session)
         if second.data != nil { return (second.data, nil) }
         return (nil, "\(first.problem ?? "failed"); over TLS 1.2: \(second.problem ?? "failed")")
     }
 
-    private static func attempt(_ request: URLRequest, session: URLSession) async -> (data: Data?, problem: String?, retry: Bool) {
+    private static func attempt(_ request: URLRequest, session: URLSession) async -> (data: Data?, problem: String?, retry: Bool, busy: Bool) {
         do {
             let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse else { return (nil, "no response", false) }
+            guard let http = response as? HTTPURLResponse else { return (nil, "no response", false, false) }
             guard (200..<300).contains(http.statusCode) else {
-                return (nil, "HTTP \(http.statusCode)", http.statusCode == 403 || http.statusCode == 406)
+                return (nil, "HTTP \(http.statusCode)", http.statusCode == 403 || http.statusCode == 406,
+                        [502, 503, 504].contains(http.statusCode))
             }
-            return (data, nil, false)
+            return (data, nil, false, false)
         } catch let error as URLError {
             let tlsFailure: Set<URLError.Code> = [
                 .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate,
                 .serverCertificateNotYetValid, .serverCertificateHasUnknownRoot, .clientCertificateRejected,
                 .networkConnectionLost,
             ]
-            return (nil, "\(error.localizedDescription) (\(error.code.rawValue))", tlsFailure.contains(error.code))
+            return (nil, "\(error.localizedDescription) (\(error.code.rawValue))", tlsFailure.contains(error.code), false)
         } catch {
-            return (nil, error.localizedDescription, false)
+            return (nil, error.localizedDescription, false, false)
         }
     }
 

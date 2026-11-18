@@ -22,13 +22,17 @@ HEADERS = {"User-Agent": "CodeShelf/1 CFNetwork/3826.400.120 Darwin/25.0.0", "Ac
 
 def fetch(url, limit=2048):
     request = urllib.request.Request(url, headers=HEADERS)
-    try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            return response.status, response.headers.get("Content-Type", ""), response.read(limit)
-    except urllib.error.HTTPError as error:
-        return error.code, "", b""
-    except Exception as error:  # DNS, TLS, timeouts
-        return None, str(error), b""
+    for delay in (0, 3, 8):  # busy servers answer 502/503/504 now and then
+        time.sleep(delay)
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                return response.status, response.headers.get("Content-Type", ""), response.read(limit)
+        except urllib.error.HTTPError as error:
+            if error.code in (502, 503, 504) and delay != 8:
+                continue
+            return error.code, "", b""
+        except Exception as error:  # DNS, TLS, timeouts
+            return None, str(error), b""
 
 
 problems = []
