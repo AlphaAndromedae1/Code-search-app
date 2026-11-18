@@ -1,7 +1,6 @@
 import Foundation
 import Security
 import SwiftUI
-import WebKit
 
 /// Weekly retail fuel prices in Ontario (cents per litre, taxes included).
 ///
@@ -337,14 +336,6 @@ final class FuelPriceStore {
     }
 }
 
-/// Servers that only answered through the direct connection this session.
-private actor DirectHosts {
-    static let shared = DirectHosts()
-    private var hosts: Set<String> = []
-    func contains(_ host: String) -> Bool { hosts.contains(host) }
-    func insert(_ host: String) { hosts.insert(host) }
-}
-
 /// Where the prices come from, and how they're read. Runs off the main thread.
 enum FuelPriceSources {
     static let ontarioCSV = URL(string: "https://ontario.ca/v1/files/fuel-prices/fueltypesall.csv")!
@@ -385,14 +376,23 @@ enum FuelPriceSources {
         var problem: String?
     }
 
-    /// A session limited to TLS 1.2. Some government servers and firewalls reject the larger TLS 1.3
-    /// handshake newer iOS versions send (with post-quantum key exchange): the secure connection fails
-    /// (-1200) or the firewall answers 403. A plain TLS 1.2 handshake gets through.
+    /// Fuel price downloads use the system's normal certificate checks, plus NRCan's root for NRCan only
+    /// (see NRCanTrustDelegate: some iPhones don't have the root NRCan's certificate chains to).
+    private static let session: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 20
+        configuration.timeoutIntervalForResource = 45
+        return URLSession(configuration: configuration, delegate: NRCanTrustDelegate(), delegateQueue: nil)
+    }()
+
+    /// The same, limited to TLS 1.2, for servers or firewalls that reject the larger TLS 1.3 handshake.
     private static let tls12Session: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.tlsMaximumSupportedProtocolVersion = .TLSv12
+        configuration.timeoutIntervalForRequest = 20
+        configuration.timeoutIntervalForResource = 45
         configuration.httpAdditionalHeaders = ["Accept-Language": "en-CA,en;q=0.9"]
-        return URLSession(configuration: configuration)
+        return URLSession(configuration: configuration, delegate: NRCanTrustDelegate(), delegateQueue: nil)
     }()
 
     /// Downloads a URL; on failure says why (HTTP status or the system's error, e.g. a certificate problem).
@@ -400,30 +400,14 @@ enum FuelPriceSources {
     static func fetch(_ request: URLRequest) async -> (data: Data?, problem: String?) {
         var request = request
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.timeoutInterval = 30
+        request.timeoutInterval = 20
         if request.value(forHTTPHeaderField: "Accept") == nil {
             request.setValue("text/csv, application/rss+xml, application/json, text/html, */*", forHTTPHeaderField: "Accept")
         }
-        let isGET = (request.httpMethod ?? "GET") == "GET"
-        // A server that already needed the direct connection gets it straight away.
-        if isGET, let url = request.url, let host = url.host, await DirectHosts.shared.contains(host) {
-            let direct = await DirectHTTPS.get(url)
-            if let data = direct.data { return (data, nil) }
-        }
-        let first = await attempt(request, session: .shared)
+        let first = await attempt(request, session: session)
         guard first.data == nil, first.retry else { return (first.data, first.problem) }
         let second = await attempt(request, session: tls12Session)
         if second.data != nil { return (second.data, nil) }
-        // iOS 27 refuses some government TLS 1.2 servers inside apps (App Transport Security) while
-        // Safari opens them: connect directly with Network.framework instead.
-        if isGET, let url = request.url {
-            let direct = await DirectHTTPS.get(url)
-            if let data = direct.data {
-                if let host = url.host { await DirectHosts.shared.insert(host) }
-                return (data, nil)
-            }
-            return (nil, "\(first.problem ?? "failed"); direct connection: \(direct.problem ?? "failed")")
-        }
         return (nil, "\(first.problem ?? "failed"); over TLS 1.2: \(second.problem ?? "failed")")
     }
 
@@ -569,14 +553,6 @@ enum FuelPriceSources {
                 break
             }
         }
-        if readings.isEmpty, !problems.isEmpty {
-            // The app's own downloads couldn't reach NRCan: read its price table the way Safari does.
-            let fromPage = await NRCanWebFallback.readings(cities: nrcanCities, year: year)
-            if !fromPage.isEmpty {
-                return Readings(readings: fromPage, problem: nil)
-            }
-            return Readings(readings: [], problem: (problems.first ?? "") + " | web page fallback: no prices read")
-        }
         return Readings(readings: readings, problem: readings.isEmpty ? problems.first : nil)
     }
 
@@ -671,74 +647,6 @@ enum FuelPriceSources {
                 readings.append(FuelPriceSnapshot.CityReading(
                     city: city.name, locationID: id, dollarsPerLitre: latest.1 / 100, date: latest.0, source: "Statistics Canada"
                 ))
-            }
-        }
-        return readings
-    }
-}
-
-/// Reads NRCan's weekly furnace oil table in a hidden web view, the same engine Safari uses, for when the
-/// app's own downloads can't connect to NRCan (seen on some phones while Safari opens the page fine).
-@MainActor
-enum NRCanWebFallback {
-    private struct Table: Decodable {
-        let cities: [String]
-        let rows: [[String]]
-    }
-
-    private static let script = """
-    (() => {
-      const table = document.getElementById('pricesTable');
-      if (!table) { return null; }
-      const cities = Array.from(table.querySelectorAll('thead th[id^="header3_"]')).map(th => th.textContent.trim());
-      const rows = Array.from(table.querySelectorAll('tr'))
-        .map(tr => Array.from(tr.querySelectorAll('td, th')).map(cell => cell.textContent.trim()))
-        .filter(cells => cells.length > 1 && /^\\d{4}-\\d{2}-\\d{2}$/.test(cells[0]));
-      return JSON.stringify({ cities: cities, rows: rows });
-    })()
-    """
-
-    static func readings(cities: [(name: String, id: Int)], year: Int) async -> [FuelPriceSnapshot.CityReading] {
-        let ids = cities.map { String($0.id) }.joined(separator: ",")
-        guard let url = URL(string: "https://www2.nrcan.gc.ca/eneene/sources/pripri/prices_bycity_e.cfm?productID=7&locationID=\(ids)&frequency=W&priceYear=\(year)&Redisplay=") else {
-            return []
-        }
-        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1024, height: 1400))
-        webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30))
-        var json: String?
-        for _ in 0..<70 { // up to about 35 seconds: the page is large
-            try? await Task.sleep(for: .milliseconds(500))
-            if webView.isLoading { continue }
-            let value = try? await webView.evaluateJavaScript(script)
-            if let text = value as? String {
-                json = text
-                break
-            }
-        }
-        guard let json, let data = json.data(using: .utf8), let table = try? JSONDecoder().decode(Table.self, from: data) else {
-            return []
-        }
-        return parse(cities: table.cities, rows: table.rows, known: cities)
-    }
-
-    /// Latest non-empty price per city. Each city has four columns: price, taxes, marketing and refining margin.
-    nonisolated static func parse(cities: [String], rows: [[String]], known: [(name: String, id: Int)]) -> [FuelPriceSnapshot.CityReading] {
-        let key = { (name: String) in name.lowercased().filter { $0.isLetter } }
-        let dates = DateFormatter()
-        dates.locale = Locale(identifier: "en_US_POSIX")
-        dates.dateFormat = "yyyy-MM-dd"
-        var readings: [FuelPriceSnapshot.CityReading] = []
-        for (column, city) in cities.enumerated() {
-            guard let match = known.first(where: { key($0.name) == key(city) }) else { continue }
-            let priceIndex = 1 + column * 4
-            for row in rows.reversed() where row.count > priceIndex {
-                if let cents = Double(row[priceIndex].replacingOccurrences(of: ",", with: "")), cents > 0,
-                   let date = dates.date(from: row[0]) {
-                    readings.append(FuelPriceSnapshot.CityReading(
-                        city: match.name, locationID: match.id, dollarsPerLitre: cents / 100, date: date, source: "NRCan (web page)"
-                    ))
-                    break
-                }
             }
         }
         return readings

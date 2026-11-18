@@ -64,19 +64,21 @@ struct CodeShelfApp: App {
                 "rows": rows.map { ["name": $0.name, "cents": $0.cents ?? -1, "per": $0.per, "date": $0.date, "note": $0.note ?? ""] as [String: Any] },
                 "naturalGas": (prices.snapshot?.naturalGas ?? []).map { "\($0.utility): \($0.centsPerCubicMetre)" },
                 "naturalGasEffective": prices.snapshot?.naturalGasEffective ?? "",
-                "directNRCan": await { () async -> String in
-                    let url = URL(string: "https://www2.nrcan.gc.ca/eneene/sources/pripri/webfeed_e.cfm?priceYear=\(Calendar(identifier: .gregorian).component(.year, from: Date()))&productID=7&locationID=72")!
-                    let result = await DirectHTTPS.get(url)
-                    if let data = result.data, let text = String(data: data, encoding: .utf8),
-                       let reading = FuelPriceSources.parseNRCanFeed(text) {
-                        return "Kingston \(reading.dollars) $/L (\(data.count) bytes)"
+                // Connect to NRCan trusting only the root bundled for it, as an iPhone without that root must.
+                "pinnedNRCan": await { () async -> String in
+                    let year = Calendar(identifier: .gregorian).component(.year, from: Date())
+                    let url = URL(string: "https://www2.nrcan.gc.ca/eneene/sources/pripri/webfeed_e.cfm?priceYear=\(year)&productID=7&locationID=72")!
+                    let session = URLSession(configuration: .ephemeral, delegate: NRCanTrustDelegate(anchorOnlyForTesting: true), delegateQueue: nil)
+                    do {
+                        let (data, _) = try await session.data(from: url)
+                        if let text = String(data: data, encoding: .utf8), let reading = FuelPriceSources.parseNRCanFeed(text) {
+                            return "Kingston \(reading.dollars) $/L"
+                        }
+                        return "no price in \(data.count) bytes"
+                    } catch {
+                        return "failed: \(error.localizedDescription)"
                     }
-                    return "failed: \(result.problem ?? "no price in \(result.data?.count ?? 0) bytes")"
                 }(),
-                "webFallback": await NRCanWebFallback.readings(
-                    cities: FuelPriceSources.nrcanCities,
-                    year: Calendar(identifier: .gregorian).component(.year, from: Date())
-                ).map { "\($0.city) \($0.centsPerLitre)" },
             ])
         }
         guard let probe = defaults.string(forKey: "searchProbe"), !probe.isEmpty else { return }

@@ -26,15 +26,10 @@ print(f"Survey markets: {probe['markets']}  error: {probe['error'] or 'none'}")
 print(f"Furnace oil cities: {', '.join(probe['furnaceOilCities']) or 'none'}")
 print(f"Heating fuel, monthly (Statistics Canada): {', '.join(probe.get('heatingMonthly', [])) or 'none'}")
 print(f"Furnace oil problems: {probe.get('furnaceProblem') or 'none'}")
-direct = probe.get("directNRCan", "")
-print(f"NRCan through the direct (Network.framework) connection: {direct or 'not run'}")
-if not direct.startswith("Kingston"):
-    print("BAD  the direct connection fallback didn't read NRCan")
-    sys.exit(1)
-web = probe.get("webFallback", [])
-print(f"Furnace oil read from NRCan's web page (fallback): {', '.join(web) or 'none'}")
-if not web:
-    print("BAD  the web page fallback read no furnace oil prices")
+pinned = probe.get("pinnedNRCan", "")
+print(f"NRCan trusting only the bundled Sectigo R46 root: {pinned or 'not run'}")
+if not pinned.startswith("Kingston"):
+    print("BAD  NRCan couldn't be verified with the bundled root")
     sys.exit(1)
 ok = True
 print(f"Natural gas ({probe.get('naturalGasEffective') or 'no date'}): {'; '.join(probe.get('naturalGas', [])) or 'none'}")
